@@ -87,6 +87,13 @@ warn_unused_ignores = true
 warn_no_return = true
 follow_imports = "normal"
 ignore_missing_imports = true
+exclude = ["tests/"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+disallow_incomplete_defs = false
 
 [tool.pytest.ini_options]
 minversion = "7.0"
@@ -116,3 +123,7 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv"]
+skips = ["B101"]  # Skip assert_used warnings
