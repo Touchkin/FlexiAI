@@ -253,6 +253,149 @@ last_provider = client.get_last_used_provider()
 print(f"Last request handled by: {last_provider}")
 ```
 
+### Testing Circuit Breaker
+
+The circuit breaker protects your application from cascading failures by detecting and isolating failing providers. Here's how to test it:
+
+#### Test 1: Invalid Credentials Detection
+
+```python
+from flexiai import FlexiAI
+from flexiai.models import FlexiAIConfig, ProviderConfig
+from flexiai.exceptions import AllProvidersFailedError
+
+# Create client with invalid API key
+client = FlexiAI(FlexiAIConfig(providers=[
+    ProviderConfig(
+        name="anthropic",
+        priority=1,
+        api_key="sk-ant-invalid-key-for-testing-12345678901234567890",
+        model="claude-3-5-haiku-20241022"
+    )
+]))
+
+# Make multiple requests - circuit breaker will track failures
+failures = 0
+for i in range(5):
+    try:
+        response = client.chat_completion(
+            messages=[{"role": "user", "content": "test"}]
+        )
+    except AllProvidersFailedError:
+        failures += 1
+        print(f"Failure {failures}: Circuit breaker counting failures")
+
+print(f"Total failures detected: {failures}/5")
+print("✅ Circuit breaker is working - invalid credentials properly rejected")
+```
+
+#### Test 2: Automatic Failover
+
+```python
+# Configure primary provider (will fail) and backup provider (will succeed)
+# Note: Must use different provider names
+client = FlexiAI(FlexiAIConfig(providers=[
+    ProviderConfig(
+        name="openai",
+        priority=1,  # Primary
+        api_key="sk-invalid-key-will-fail-12345678901234567890",
+        model="gpt-3.5-turbo"
+    ),
+    ProviderConfig(
+        name="anthropic",
+        priority=2,  # Backup
+        api_key=os.getenv("ANTHROPIC_API_KEY"),  # Valid key
+        model="claude-3-5-haiku-20241022"
+    )
+]))
+
+# Make request - should automatically failover to backup
+try:
+    response = client.chat_completion(
+        messages=[{"role": "user", "content": "Say 'Failover works!'"}]
+    )
+    print(f"✅ Failover successful!")
+    print(f"Response: {response.content}")
+    print(f"Provider used: {response.provider}")
+
+    # Check statistics
+    stats = client.get_request_stats()
+    print(f"Total requests: {stats['total_requests']}")
+    print(f"Successful: {stats['successful_requests']}")
+    print(f"Failed: {stats['failed_requests']}")
+except Exception as e:
+    print(f"❌ Failover failed: {e}")
+```
+
+#### Test 3: Circuit Breaker States
+
+```python
+# Monitor circuit breaker state transitions
+provider_status = client.get_provider_status()
+
+for provider_name, info in provider_status.items():
+    print(f"\nProvider: {provider_name}")
+    print(f"  State: {info['circuit_breaker']['state']}")
+    print(f"  Healthy: {info['healthy']}")
+    print(f"  Failure Count: {info['circuit_breaker']['failure_count']}")
+    print(f"  Success Count: {info['circuit_breaker']['success_count']}")
+```
+
+**Circuit Breaker States:**
+- **CLOSED**: Normal operation, requests passing through
+- **OPEN**: Too many failures, requests blocked (fail-fast)
+- **HALF_OPEN**: Testing recovery, limited requests allowed
+
+#### Test 4: Recovery Testing
+
+```python
+import time
+
+# Create client with valid credentials
+client = FlexiAI(FlexiAIConfig(providers=[
+    ProviderConfig(
+        name="anthropic",
+        priority=1,
+        api_key=os.getenv("ANTHROPIC_API_KEY"),
+        model="claude-3-5-haiku-20241022"
+    )
+]))
+
+# Make successful request
+response = client.chat_completion(
+    messages=[{"role": "user", "content": "Hello"}]
+)
+print(f"✅ Successful request: {response.content}")
+
+# Check that circuit is CLOSED (healthy)
+status = client.get_provider_status()
+for provider, info in status.items():
+    state = info['circuit_breaker']['state']
+    print(f"Circuit state after success: {state}")
+    assert state == "CLOSED", "Circuit should be CLOSED after successful request"
+```
+
+#### Complete Test Script
+
+For a comprehensive test, see `examples/circuit_breaker_test.py`:
+
+```bash
+# Set your API keys
+export ANTHROPIC_API_KEY="sk-ant-api03-..."
+export OPENAI_API_KEY="sk-..."
+
+# Run the test
+python examples/circuit_breaker_test.py
+```
+
+**What the test validates:**
+- ✅ Invalid credentials are detected immediately
+- ✅ Circuit breaker tracks failure counts
+- ✅ Automatic failover to backup providers
+- ✅ Provider health monitoring
+- ✅ Request statistics tracking
+- ✅ Graceful error handling
+
 ## 🔧 Configuration
 
 ### From Dictionary
