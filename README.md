@@ -8,11 +8,11 @@
 
 ## 🌟 Features
 
-- **Multi-Provider Support**: OpenAI and Google Vertex AI
+- **Multi-Provider Support**: OpenAI, Google Vertex AI, and Anthropic Claude
 - **Automatic Failover**: Priority-based provider selection with circuit breaker pattern
 - **Unified Interface**: Single API for all providers
 - **Type-Safe**: Full type hints and Pydantic validation
-- **Production-Ready**: 98% test coverage, comprehensive error handling
+- **Production-Ready**: 95% test coverage, comprehensive error handling
 - **Flexible Authentication**: API keys, service accounts, and ADC support
 - **Token Tracking**: Monitor usage across all providers
 - **Request Metadata**: Track which provider handled each request
@@ -31,6 +31,9 @@ pip install openai
 
 # For Google Vertex AI support
 pip install google-genai google-auth
+
+# For Anthropic Claude support
+pip install anthropic
 ```
 
 Or install all providers at once:
@@ -100,6 +103,39 @@ response = client.chat_completion(
 )
 ```
 
+### Using Anthropic Claude
+
+```python
+config = FlexiAIConfig(
+    providers=[
+        ProviderConfig(
+            name="anthropic",
+            api_key="sk-ant-your-anthropic-api-key",
+            model="claude-3-5-sonnet-20241022",
+            priority=1
+        )
+    ]
+)
+
+client = FlexiAI(config)
+response = client.chat_completion(
+    messages=[
+        Message(role="system", content="You are a helpful assistant."),
+        Message(role="user", content="Explain quantum computing briefly.")
+    ],
+    max_tokens=200
+)
+
+print(response.content)
+```
+
+**Supported Claude Models:**
+- `claude-3-opus-20240229` - Most capable model
+- `claude-3-sonnet-20240229` - Balanced performance
+- `claude-3-haiku-20240307` - Fastest responses
+- `claude-3-5-sonnet-20241022` - Latest Sonnet (recommended)
+- `claude-3-5-haiku-20241022` - Latest Haiku
+
 ## 🔄 Multi-Provider Failover
 
 Configure multiple providers with priorities for automatic failover:
@@ -117,17 +153,24 @@ config = FlexiAIConfig(
             model="gpt-4o-mini",
             priority=1
         ),
-        # Fallback: Google Vertex AI
+        # Secondary: Google Vertex AI
         ProviderConfig(
             name="vertexai",
             api_key="not-used",
-            model="gemini-2.0-flash",
+            model="gemini-2.0-flash-exp",
             priority=2,
             config={
                 "project": "your-gcp-project",
                 "location": "us-central1",
                 "service_account_file": "/path/to/credentials.json"
             }
+        ),
+        # Tertiary: Anthropic Claude
+        ProviderConfig(
+            name="anthropic",
+            api_key="sk-ant-your-anthropic-key",
+            model="claude-3-5-sonnet-20241022",
+            priority=3
         )
     ],
     circuit_breaker=CircuitBreakerConfig(
@@ -139,7 +182,7 @@ config = FlexiAIConfig(
 
 client = FlexiAI(config)
 
-# If OpenAI fails, automatically falls back to Vertex AI
+# If OpenAI fails, automatically falls back to Vertex AI, then Claude
 response = client.chat_completion(
     messages=[Message(role="user", content="Tell me a joke")]
 )
@@ -301,7 +344,7 @@ Vertex AI supports multiple authentication methods:
 ProviderConfig(
     name="vertexai",
     api_key="not-used",
-    model="gemini-2.0-flash",
+    model="gemini-2.0-flash-exp",
     config={
         "project": "your-gcp-project-id",
         "location": "us-central1",
@@ -325,12 +368,41 @@ export GOOGLE_CLOUD_PROJECT="your-project-id"
 ProviderConfig(
     name="vertexai",
     api_key="not-used",
-    model="gemini-2.0-flash",
+    model="gemini-2.0-flash-exp",
     config={
         "project": "your-gcp-project-id",
         "location": "us-central1"
         # Will use ADC automatically
     }
+)
+```
+
+### Anthropic Claude
+
+Anthropic uses API keys for authentication:
+
+```bash
+# Set environment variable
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+```python
+ProviderConfig(
+    name="anthropic",
+    api_key="sk-ant-...",  # Get from https://console.anthropic.com/
+    model="claude-3-5-sonnet-20241022"
+)
+```
+
+Or load from environment:
+
+```python
+import os
+
+ProviderConfig(
+    name="anthropic",
+    api_key=os.getenv("ANTHROPIC_API_KEY"),
+    model="claude-3-5-sonnet-20241022"
 )
 ```
 
@@ -345,12 +417,20 @@ ProviderConfig(
 
 ### Google Vertex AI Models
 
-- `gemini-2.0-flash` - Latest Gemini on GCP
+- `gemini-2.0-flash-exp` - Latest experimental Gemini on GCP
 - `gemini-1.5-pro` - Advanced Gemini on GCP
 - `gemini-1.5-flash` - Fast Gemini on GCP
 - `text-bison` - Text generation
 - `chat-bison` - Chat interactions
 - `codechat-bison` - Code assistance
+
+### Anthropic Claude Models
+
+- `claude-3-opus-20240229` - Most capable, best for complex tasks
+- `claude-3-sonnet-20240229` - Balanced performance and speed
+- `claude-3-haiku-20240307` - Fastest, most cost-effective
+- `claude-3-5-sonnet-20241022` - Latest Sonnet (recommended)
+- `claude-3-5-haiku-20241022` - Latest Haiku
 
 ## 📚 Documentation
 

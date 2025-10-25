@@ -155,3 +155,4 @@ flexiai.log
 *.log
 config.json
 .flexiai/
+.env.test

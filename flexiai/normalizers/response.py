@@ -514,3 +514,228 @@ class GeminiResponseNormalizer(ResponseNormalizer):
         # We can check if it's a partial response or has specific streaming indicators
         # For now, we'll use a simple heuristic
         return "candidates" in response and len(response.get("candidates", [])) == 1
+
+
+class ClaudeResponseNormalizer(ResponseNormalizer):
+    """
+    Response normalizer for Anthropic Claude API.
+
+    Key differences from OpenAI:
+    - Content is an array of content blocks (not a single string)
+    - Usage has input_tokens/output_tokens (not prompt_tokens/completion_tokens)
+    - stop_reason values are different (end_turn, max_tokens, stop_sequence)
+    - May have multiple content blocks in response
+    """
+
+    # Stop reason mapping from Claude to unified format
+    STOP_REASON_MAPPING = {
+        "end_turn": "stop",
+        "max_tokens": "length",
+        "stop_sequence": "stop",
+        "tool_use": "tool_calls",
+    }
+
+    def normalize(
+        self, response: Dict[str, Any], provider_name: str = "claude", model: str = ""
+    ) -> UnifiedResponse:
+        """
+        Normalize Claude Messages API response to unified format.
+
+        Args:
+            response: Claude API response dictionary
+            provider_name: Provider name (default: "claude")
+            model: Model name from the request
+
+        Returns:
+            Unified response object
+
+        Raises:
+            InvalidResponseError: If response is malformed
+        """
+        self._validate_response(response)
+
+        try:
+            # Extract content from content blocks
+            content = self._extract_content(response)
+
+            # Extract usage information
+            usage = self._extract_usage(response)
+
+            # Map stop reason
+            stop_reason = response.get("stop_reason")
+            finish_reason = self.STOP_REASON_MAPPING.get(stop_reason, "unknown")
+
+            # Extract model (use from response or fallback to provided)
+            response_model = response.get("model", model)
+
+            # Build metadata
+            metadata = {
+                "provider": provider_name,
+                "stop_reason": stop_reason,  # Original Claude stop_reason
+                "message_id": response.get("id"),
+                "type": response.get("type"),
+            }
+
+            # Add stop_sequence if present
+            if response.get("stop_sequence"):
+                metadata["stop_sequence"] = response["stop_sequence"]
+
+            # Create unified response
+            return UnifiedResponse(
+                content=content,
+                model=response_model,
+                provider=provider_name,
+                finish_reason=finish_reason,
+                usage=usage,
+                metadata=metadata,
+            )
+
+        except KeyError as e:
+            raise InvalidResponseError(f"Missing required field in Claude response: {e}") from e
+        except Exception as e:
+            raise InvalidResponseError(f"Failed to normalize Claude response: {e}") from e
+
+    def _extract_content(self, response: Dict[str, Any]) -> str:
+        """
+        Extract text content from Claude's content blocks.
+
+        Claude returns content as an array of blocks. Each block can be:
+        - {"type": "text", "text": "..."}
+        - {"type": "tool_use", "id": "...", "name": "...", "input": {...}}
+
+        Args:
+            response: Claude response dictionary
+
+        Returns:
+            Concatenated text from all text content blocks
+
+        Raises:
+            InvalidResponseError: If content structure is invalid
+        """
+        content_blocks = response.get("content", [])
+
+        if not isinstance(content_blocks, list):
+            raise InvalidResponseError("Claude content must be a list")
+
+        if not content_blocks:
+            return ""
+
+        # Extract text from all text blocks
+        text_parts = []
+        for block in content_blocks:
+            if not isinstance(block, dict):
+                continue
+
+            block_type = block.get("type")
+
+            if block_type == "text":
+                text = block.get("text", "")
+                text_parts.append(text)
+            elif block_type == "tool_use":
+                # For tool use, we could format it as a message
+                # For now, just note it in the text
+                tool_name = block.get("name", "unknown")
+                text_parts.append(f"[Tool use: {tool_name}]")
+
+        return "".join(text_parts)
+
+    def _extract_usage(self, response: Dict[str, Any]) -> UsageInfo:
+        """
+        Extract usage information from Claude response.
+
+        Claude uses:
+        - input_tokens (maps to prompt_tokens)
+        - output_tokens (maps to completion_tokens)
+
+        Args:
+            response: Claude response dictionary
+
+        Returns:
+            UsageInfo object with token counts
+
+        Raises:
+            InvalidResponseError: If usage data is invalid
+        """
+        usage_data = response.get("usage", {})
+
+        if not isinstance(usage_data, dict):
+            # Return empty usage if not present
+            return UsageInfo(prompt_tokens=0, completion_tokens=0, total_tokens=0)
+
+        input_tokens = usage_data.get("input_tokens", 0)
+        output_tokens = usage_data.get("output_tokens", 0)
+
+        # Map to unified format
+        return UsageInfo(
+            prompt_tokens=input_tokens,
+            completion_tokens=output_tokens,
+            total_tokens=input_tokens + output_tokens,
+        )
+
+    def normalize_error(
+        self, error_response: Dict[str, Any], provider_name: str = "claude"
+    ) -> Dict[str, Any]:
+        """
+        Normalize Claude error responses.
+
+        Claude error format:
+        {
+            "type": "error",
+            "error": {
+                "type": "invalid_request_error",
+                "message": "..."
+            }
+        }
+
+        Args:
+            error_response: Claude error response
+            provider_name: Provider name
+
+        Returns:
+            Normalized error dictionary
+        """
+        if not isinstance(error_response, dict):
+            return {
+                "provider": provider_name,
+                "message": str(error_response),
+                "status": "error",
+            }
+
+        # Extract error details
+        error_data = error_response.get("error", {})
+
+        if isinstance(error_data, dict):
+            error_type = error_data.get("type", "unknown_error")
+            error_message = error_data.get("message", "Unknown error")
+
+            return {
+                "provider": provider_name,
+                "type": error_type,
+                "message": error_message,
+                "status": "error",
+            }
+
+        # Fallback
+        return {
+            "provider": provider_name,
+            "message": str(error_response),
+            "status": "error",
+        }
+
+    def is_streaming_response(self, response: Dict[str, Any]) -> bool:
+        """
+        Check if response is from a streaming request.
+
+        Args:
+            response: Response to check
+
+        Returns:
+            True if response is from streaming
+
+        Note:
+            Claude streaming responses come as delta events.
+            This checks for streaming-specific fields.
+        """
+        # Claude streaming responses have "type": "content_block_delta" or similar
+        response_type = response.get("type", "")
+        return "delta" in response_type or "stream" in response_type
