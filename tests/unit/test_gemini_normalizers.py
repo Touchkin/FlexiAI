@@ -196,20 +196,25 @@ class TestGeminiResponseNormalizer:
 
     def test_basic_response_normalization(self, normalizer):
         """Test basic response normalization."""
-        # Mock Gemini response
-        from google.genai.types import FinishReason
-
-        mock_response = Mock()
-        mock_response.text = "Hello! How can I help you today?"
-        mock_response.candidates = [Mock()]
-        mock_response.candidates[0].finish_reason = FinishReason.STOP
-        mock_response.candidates[0].content.parts = [Mock(text="Hello! How can I help you today?")]
-        mock_response.usage_metadata = Mock(
-            prompt_token_count=10, candidates_token_count=15, total_token_count=25
-        )
+        # Create response dict in Gemini format (after _response_to_dict conversion)
+        response_dict = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Hello! How can I help you today?"}]},
+                    "finishReason": "STOP",
+                    "safetyRatings": [],
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 10,
+                "candidatesTokenCount": 15,
+                "totalTokenCount": 25,
+            },
+            "modelVersion": "gemini-2.0-flash-exp",
+        }
 
         unified_response = normalizer.normalize(
-            mock_response, model="gemini-2.0-flash-exp", provider="gemini"
+            response_dict, provider_name="gemini", model="gemini-2.0-flash-exp"
         )
 
         assert unified_response.content == "Hello! How can I help you today?"
@@ -222,34 +227,46 @@ class TestGeminiResponseNormalizer:
 
     def test_finish_reason_stop(self, normalizer):
         """Test STOP finish reason normalization."""
-        from google.genai.types import FinishReason
+        response_dict = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Done"}]},
+                    "finishReason": "STOP",
+                    "safetyRatings": [],
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 5,
+                "candidatesTokenCount": 5,
+                "totalTokenCount": 10,
+            },
+        }
 
-        mock_response = Mock()
-        mock_response.text = "Done"
-        mock_response.candidates = [Mock()]
-        mock_response.candidates[0].finish_reason = FinishReason.STOP
-        mock_response.candidates[0].content.parts = [Mock(text="Done")]
-        mock_response.usage_metadata = Mock(
-            prompt_token_count=5, candidates_token_count=5, total_token_count=10
+        unified_response = normalizer.normalize(
+            response_dict, provider_name="gemini", model="gemini-2.0-flash-exp"
         )
-
-        unified_response = normalizer.normalize(mock_response, "gemini-2.0-flash-exp", "gemini")
         assert unified_response.finish_reason == "stop"
 
     def test_finish_reason_max_tokens(self, normalizer):
         """Test MAX_TOKENS finish reason normalization."""
-        from google.genai.types import FinishReason
+        response_dict = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Incomplete"}]},
+                    "finishReason": "MAX_TOKENS",
+                    "safetyRatings": [],
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 5,
+                "candidatesTokenCount": 100,
+                "totalTokenCount": 105,
+            },
+        }
 
-        mock_response = Mock()
-        mock_response.text = "Incomplete"
-        mock_response.candidates = [Mock()]
-        mock_response.candidates[0].finish_reason = FinishReason.MAX_TOKENS
-        mock_response.candidates[0].content.parts = [Mock(text="Incomplete")]
-        mock_response.usage_metadata = Mock(
-            prompt_token_count=5, candidates_token_count=100, total_token_count=105
+        unified_response = normalizer.normalize(
+            response_dict, provider_name="gemini", model="gemini-2.0-flash-exp"
         )
-
-        unified_response = normalizer.normalize(mock_response, "gemini-2.0-flash-exp", "gemini")
         assert unified_response.finish_reason == "length"
 
     def test_finish_reason_safety(self, normalizer):
@@ -268,34 +285,46 @@ class TestGeminiResponseNormalizer:
 
     def test_finish_reason_other(self, normalizer):
         """Test OTHER/RECITATION finish reason normalization."""
-        from google.genai.types import FinishReason
+        response_dict = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Response"}]},
+                    "finishReason": "OTHER",
+                    "safetyRatings": [],
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 5,
+                "candidatesTokenCount": 5,
+                "totalTokenCount": 10,
+            },
+        }
 
-        mock_response = Mock()
-        mock_response.text = "Response"
-        mock_response.candidates = [Mock()]
-        mock_response.candidates[0].finish_reason = FinishReason.OTHER
-        mock_response.candidates[0].content.parts = [Mock(text="Response")]
-        mock_response.usage_metadata = Mock(
-            prompt_token_count=5, candidates_token_count=5, total_token_count=10
+        unified_response = normalizer.normalize(
+            response_dict, provider_name="gemini", model="gemini-2.0-flash-exp"
         )
-
-        unified_response = normalizer.normalize(mock_response, "gemini-2.0-flash-exp", "gemini")
-        assert unified_response.finish_reason == "stop"  # Default to stop for OTHER
+        assert unified_response.finish_reason == "unknown"  # OTHER maps to unknown
 
     def test_usage_metadata_extraction(self, normalizer):
         """Test token usage metadata extraction."""
-        from google.genai.types import FinishReason
+        response_dict = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Test"}]},
+                    "finishReason": "STOP",
+                    "safetyRatings": [],
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 100,
+                "candidatesTokenCount": 50,
+                "totalTokenCount": 150,
+            },
+        }
 
-        mock_response = Mock()
-        mock_response.text = "Response"
-        mock_response.candidates = [Mock()]
-        mock_response.candidates[0].finish_reason = FinishReason.STOP
-        mock_response.candidates[0].content.parts = [Mock(text="Response")]
-        mock_response.usage_metadata = Mock(
-            prompt_token_count=100, candidates_token_count=50, total_token_count=150
+        unified_response = normalizer.normalize(
+            response_dict, provider_name="gemini", model="gemini-2.0-flash-exp"
         )
-
-        unified_response = normalizer.normalize(mock_response, "gemini-2.0-flash-exp", "gemini")
 
         assert unified_response.usage.prompt_tokens == 100
         assert unified_response.usage.completion_tokens == 50
@@ -303,16 +332,20 @@ class TestGeminiResponseNormalizer:
 
     def test_missing_usage_metadata(self, normalizer):
         """Test handling of missing usage metadata."""
-        from google.genai.types import FinishReason
+        response_dict = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Response"}]},
+                    "finishReason": "STOP",
+                    "safetyRatings": [],
+                }
+            ],
+            "usageMetadata": {},  # Missing token counts
+        }
 
-        mock_response = Mock()
-        mock_response.text = "Response"
-        mock_response.candidates = [Mock()]
-        mock_response.candidates[0].finish_reason = FinishReason.STOP
-        mock_response.candidates[0].content.parts = [Mock(text="Response")]
-        mock_response.usage_metadata = None
-
-        unified_response = normalizer.normalize(mock_response, "gemini-2.0-flash-exp", "gemini")
+        unified_response = normalizer.normalize(
+            response_dict, provider_name="gemini", model="gemini-2.0-flash-exp"
+        )
 
         # Should handle missing usage gracefully
         assert unified_response.usage.prompt_tokens == 0
@@ -321,21 +354,26 @@ class TestGeminiResponseNormalizer:
 
     def test_metadata_preservation(self, normalizer):
         """Test that Gemini-specific metadata is preserved."""
-        from google.genai.types import FinishReason
+        response_dict = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "Response"}]},
+                    "finishReason": "STOP",
+                    "safetyRatings": [
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "probability": "NEGLIGIBLE"}
+                    ],
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 10,
+                "candidatesTokenCount": 10,
+                "totalTokenCount": 20,
+            },
+        }
 
-        mock_response = Mock()
-        mock_response.text = "Response"
-        mock_response.candidates = [Mock()]
-        mock_response.candidates[0].finish_reason = FinishReason.STOP
-        mock_response.candidates[0].content.parts = [Mock(text="Response")]
-        mock_response.candidates[0].safety_ratings = [
-            Mock(category="HARM_CATEGORY_HATE_SPEECH", probability="NEGLIGIBLE")
-        ]
-        mock_response.usage_metadata = Mock(
-            prompt_token_count=10, candidates_token_count=10, total_token_count=20
+        unified_response = normalizer.normalize(
+            response_dict, provider_name="gemini", model="gemini-2.0-flash-exp"
         )
-
-        unified_response = normalizer.normalize(mock_response, "gemini-2.0-flash-exp", "gemini")
 
         # Gemini-specific metadata should be in the metadata field
         assert "safety_ratings" in unified_response.metadata

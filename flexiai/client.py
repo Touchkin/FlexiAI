@@ -12,13 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from flexiai.exceptions import AllProvidersFailedError, CircuitBreakerOpenError
 from flexiai.models import FlexiAIConfig, UnifiedRequest, UnifiedResponse
-from flexiai.providers import (
-    BaseProvider,
-    GeminiProvider,
-    OpenAIProvider,
-    ProviderRegistry,
-    VertexAIProvider,
-)
+from flexiai.providers import BaseProvider, OpenAIProvider, ProviderRegistry, VertexAIProvider
 from flexiai.utils.logger import FlexiAILogger
 
 
@@ -118,7 +112,6 @@ class FlexiAI:
         """
         provider_map = {
             "openai": OpenAIProvider,
-            "gemini": GeminiProvider,
             "vertexai": VertexAIProvider,
             # Add more providers as implemented:
             # "anthropic": AnthropicProvider,

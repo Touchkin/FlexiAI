@@ -1,7 +1,9 @@
 # FlexiAI: Comprehensive Development Plan
 
 ## Project Overview
-FlexiAI is a Python wheel package that provides a unified interface for multiple GenAI providers (OpenAI, Gemini, Claude) with automatic failover capabilities using circuit breaker pattern.
+FlexiAI is a Python wheel package that provides a unified interface for multiple GenAI providers (OpenAI, Vertex AI, Claude) with automatic failover capabilities using circuit breaker pattern.
+
+**Note**: GeminiProvider (Developer API) has been removed. Use VertexAIProvider for Google's Gemini models on GCP.
 
 ---
 
@@ -21,7 +23,7 @@ FlexiAI/
 │   │   ├── __init__.py
 │   │   ├── base.py           # Abstract base provider
 │   │   ├── openai_provider.py
-│   │   ├── gemini_provider.py
+│   │   ├── vertexai_provider.py  # Google Vertex AI (Gemini on GCP)
 │   │   ├── anthropic_provider.py
 │   │   └── registry.py       # Provider registry
 │   ├── circuit_breaker/
@@ -84,11 +86,14 @@ Configuration Structure:
             }
         },
         {
-            "name": "gemini",
+            "name": "vertexai",
             "priority": 2,
-            "api_key": "...",
-            "model": "gemini-pro",
-            "config": {}
+            "api_key": "not-used",
+            "model": "gemini-2.0-flash",
+            "config": {
+                "project": "gcp-project-id",
+                "location": "us-central1"
+            }
         },
         {
             "name": "anthropic",
@@ -1445,19 +1450,19 @@ logger.critical(f"All providers failed for request {request_id}")
 def method_name(param1: Type1, param2: Type2) -> ReturnType:
     """
     Brief description of what the method does.
-    
+
     Longer description if needed, explaining the purpose and behavior.
-    
+
     Args:
         param1: Description of param1
         param2: Description of param2
-        
+
     Returns:
         Description of return value
-        
+
     Raises:
         ExceptionType: When this exception is raised
-        
+
     Example:
         >>> obj = ClassName()
         >>> result = obj.method_name("value1", "value2")

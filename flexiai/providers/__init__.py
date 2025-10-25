@@ -1,7 +1,6 @@
 """Provider implementations for different GenAI services."""
 
 from flexiai.providers.base import BaseProvider
-from flexiai.providers.gemini_provider import GeminiProvider
 from flexiai.providers.openai_provider import OpenAIProvider
 from flexiai.providers.registry import ProviderRegistry
 from flexiai.providers.vertexai_provider import VertexAIProvider
@@ -9,7 +8,6 @@ from flexiai.providers.vertexai_provider import VertexAIProvider
 __all__ = [
     "BaseProvider",
     "OpenAIProvider",
-    "GeminiProvider",
     "VertexAIProvider",
     "ProviderRegistry",
 ]
