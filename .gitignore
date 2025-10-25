@@ -6,6 +6,23 @@ __pycache__/
 # C extensions
 *.so
 
+# SECURITY: Never commit credentials!
+*.json
+!package*.json
+!tsconfig*.json
+*.key
+*.pem
+*.p12
+*.pfx
+.env
+.env.*
+credentials/
+secrets/
+*-credentials.json
+*-key.json
+service-account*.json
+dev-gemini-*.json
+
 # Distribution / packaging
 .Python
 build/
