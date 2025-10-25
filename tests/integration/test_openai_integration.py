@@ -9,7 +9,7 @@ Note: These tests will consume API tokens and incur costs.
 
 import pytest
 
-from flexiai import ProviderConfig
+from flexiai import FlexiAI, FlexiAIConfig, ProviderConfig
 
 # Mark all tests in this module as integration tests
 pytestmark = pytest.mark.integration
@@ -130,7 +130,7 @@ class TestErrorHandling:
     """Test error handling with real API."""
 
     def test_invalid_api_key(self, rate_limiter):
-        """Test that invalid API key raises error during API call."""
+        """Test that invalid API key format raises ValidationError during client init."""
         from flexiai.exceptions import ValidationError
         from flexiai.providers.registry import ProviderRegistry
 
@@ -139,15 +139,20 @@ class TestErrorHandling:
             if ProviderRegistry._instance is not None:
                 ProviderRegistry._instance.clear()
 
-        # Invalid API key will fail validation during client initialization
-        # because we validate the key format
+        # Create client with invalid API key format
+        # Should fail during initialization because we validate the key format
         with pytest.raises(ValidationError) as exc_info:
-            ProviderConfig(
-                name="openai",
-                priority=1,
-                api_key="sk-invalid-key-12345",  # Invalid format
-                model="gpt-4.1-nano-2025-04-14",
+            config = FlexiAIConfig(
+                providers=[
+                    ProviderConfig(
+                        name="openai",
+                        priority=1,
+                        api_key="sk-invalid123",  # Invalid format (too short)
+                        model="gpt-4.1-nano-2025-04-14",
+                    )
+                ]
             )
+            FlexiAI(config=config)
 
         assert "Invalid API key format" in str(exc_info.value)
 
@@ -157,6 +162,7 @@ class TestErrorHandling:
                 ProviderRegistry._instance.clear()
 
         # Rate limit
+        rate_limiter()
         rate_limiter()
 
     def test_empty_message_list(self, integration_client, rate_limiter):
