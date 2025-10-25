@@ -213,13 +213,13 @@
 - [x] All 308 tests passing, 98% overall coverage
 
 ### Phase 1.9: Provider Registry
-- [ ] Implement `providers/registry.py`:
-  - [ ] `ProviderRegistry` singleton class
-  - [ ] Register/unregister providers
-  - [ ] Get provider by name
-  - [ ] List available providers
-  - [ ] Provider priority management
-- [ ] Add provider discovery mechanism
+- [x] Implement `providers/registry.py`:
+  - [x] `ProviderRegistry` singleton class
+  - [x] Register/unregister providers
+  - [x] Get provider by name
+  - [x] List available providers
+  - [x] Provider priority management
+- [x] Add provider discovery mechanism
 
 ### Phase 1.10: Main Client Implementation ✅ (100% Complete)
 - [x] Implement `client.py` - `FlexiAI` class:
@@ -265,14 +265,14 @@
 **Results:** 377 tests passing (12 new), 98% coverage maintained
 
 ### Phase 1.12: Integration Tests
-- [ ] Create integration tests with real OpenAI API:
-  - [ ] Simple completion test
-  - [ ] Multi-turn conversation test
-  - [ ] Error handling test (invalid API key)
-  - [ ] Failover test (mock primary failure)
-- [ ] Add tests in `tests/integration/`
-- [ ] Use environment variables for API keys
-- [ ] Add skip markers for tests requiring API keys
+- [x] Create integration tests with real OpenAI API:
+  - [x] Simple completion test
+  - [x] Multi-turn conversation test
+  - [x] Error handling test (invalid API key)
+  - [x] Failover test (mock primary failure)
+- [x] Add tests in `tests/integration/`
+- [x] Use environment variables for API keys
+- [x] Add skip markers for tests requiring API keys
 
 ### Phase 1.13: Documentation and Examples
 - [ ] Create comprehensive README.md:
