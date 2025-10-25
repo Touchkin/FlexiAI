@@ -65,11 +65,15 @@ class TestVertexAIProviderInitialization:
             assert call_kwargs["project"] == "test-project-123"
             assert call_kwargs["location"] == "us-central1"
 
-    def test_initialization_missing_project(self):
+    def test_initialization_missing_project(self, monkeypatch):
         """Test initialization fails without project ID."""
+        # Clear environment variables
+        monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+        monkeypatch.delenv("GOOGLE_CLOUD_LOCATION", raising=False)
+
         config = ProviderConfig(
             name="vertexai",
-            api_key="not-used",
+            api_key="not-used",  # Placeholder to force ADC path
             model="gemini-2.0-flash",
             priority=1,
             config={},  # Missing project
@@ -129,7 +133,7 @@ class TestVertexAIChatCompletion:
         mock_response.candidates = [Mock()]
         mock_response.candidates[0].content.parts = [Mock(text="Hello! How can I help you?")]
         mock_response.candidates[0].content.role = "model"
-        mock_response.candidates[0].finish_reason = types.Candidate.FinishReason.STOP
+        mock_response.candidates[0].finish_reason = types.FinishReason.STOP
         mock_response.usage_metadata.prompt_token_count = 10
         mock_response.usage_metadata.candidates_token_count = 8
         mock_response.usage_metadata.total_token_count = 18
@@ -156,7 +160,7 @@ class TestVertexAIChatCompletion:
         mock_response.candidates = [Mock()]
         mock_response.candidates[0].content.parts = [Mock(text="Response")]
         mock_response.candidates[0].content.role = "model"
-        mock_response.candidates[0].finish_reason = types.Candidate.FinishReason.STOP
+        mock_response.candidates[0].finish_reason = types.FinishReason.STOP
         mock_response.usage_metadata.prompt_token_count = 15
         mock_response.usage_metadata.candidates_token_count = 5
         mock_response.usage_metadata.total_token_count = 20
@@ -189,7 +193,7 @@ class TestVertexAIChatCompletion:
         mock_response.candidates = [Mock()]
         mock_response.candidates[0].content.parts = [Mock(text="Final response")]
         mock_response.candidates[0].content.role = "model"
-        mock_response.candidates[0].finish_reason = types.Candidate.FinishReason.STOP
+        mock_response.candidates[0].finish_reason = types.FinishReason.STOP
         mock_response.usage_metadata.prompt_token_count = 30
         mock_response.usage_metadata.candidates_token_count = 10
         mock_response.usage_metadata.total_token_count = 40
@@ -262,7 +266,7 @@ class TestVertexAIRequestNormalization:
         mock_response.candidates = [Mock()]
         mock_response.candidates[0].content.parts = [Mock(text="Response")]
         mock_response.candidates[0].content.role = "model"
-        mock_response.candidates[0].finish_reason = types.Candidate.FinishReason.STOP
+        mock_response.candidates[0].finish_reason = types.FinishReason.STOP
         mock_response.usage_metadata.prompt_token_count = 5
         mock_response.usage_metadata.candidates_token_count = 3
         mock_response.usage_metadata.total_token_count = 8
@@ -292,7 +296,7 @@ class TestVertexAIRequestNormalization:
         mock_response.candidates = [Mock()]
         mock_response.candidates[0].content.parts = [Mock(text="Response")]
         mock_response.candidates[0].content.role = "model"
-        mock_response.candidates[0].finish_reason = types.Candidate.FinishReason.STOP
+        mock_response.candidates[0].finish_reason = types.FinishReason.STOP
         mock_response.usage_metadata.prompt_token_count = 5
         mock_response.usage_metadata.candidates_token_count = 3
         mock_response.usage_metadata.total_token_count = 8
@@ -319,9 +323,9 @@ class TestVertexAIResponseNormalization:
     def test_finish_reason_mapping(self, vertexai_provider):
         """Test that finish reasons are correctly mapped."""
         finish_reasons_to_test = [
-            (types.Candidate.FinishReason.STOP, "stop"),
-            (types.Candidate.FinishReason.MAX_TOKENS, "length"),
-            (types.Candidate.FinishReason.SAFETY, "content_filter"),
+            (types.FinishReason.STOP, "stop"),
+            (types.FinishReason.MAX_TOKENS, "length"),
+            (types.FinishReason.SAFETY, "content_filter"),
         ]
 
         for vertex_reason, expected_reason in finish_reasons_to_test:
@@ -349,7 +353,7 @@ class TestVertexAIResponseNormalization:
         mock_response.candidates = [Mock()]
         mock_response.candidates[0].content.parts = [Mock(text="Response")]
         mock_response.candidates[0].content.role = "model"
-        mock_response.candidates[0].finish_reason = types.Candidate.FinishReason.STOP
+        mock_response.candidates[0].finish_reason = types.FinishReason.STOP
         mock_response.usage_metadata.prompt_token_count = 123
         mock_response.usage_metadata.candidates_token_count = 456
         mock_response.usage_metadata.total_token_count = 579
@@ -374,7 +378,7 @@ class TestVertexAIHealthCheck:
         mock_response.candidates = [Mock()]
         mock_response.candidates[0].content.parts = [Mock(text="Hi")]
         mock_response.candidates[0].content.role = "model"
-        mock_response.candidates[0].finish_reason = types.Candidate.FinishReason.STOP
+        mock_response.candidates[0].finish_reason = types.FinishReason.STOP
         mock_response.usage_metadata.prompt_token_count = 1
         mock_response.usage_metadata.candidates_token_count = 1
         mock_response.usage_metadata.total_token_count = 2
