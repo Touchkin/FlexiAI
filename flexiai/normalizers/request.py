@@ -354,3 +354,161 @@ class GeminiRequestNormalizer(RequestNormalizer):
             "gemini-ultra",
         ]
         return any(model.startswith(prefix) for prefix in supported_prefixes)
+
+
+class ClaudeRequestNormalizer(RequestNormalizer):
+    """
+    Request normalizer for Anthropic Claude API.
+
+    Key differences from OpenAI:
+    - System messages are separate (not in messages array)
+    - max_tokens is REQUIRED
+    - No consecutive messages with same role
+    - Uses stop_sequences instead of stop
+    - Supports top_k parameter (Claude-specific)
+    """
+
+    # Parameter mapping from UnifiedRequest to Claude API
+    PARAMETER_MAPPING = {
+        "temperature": "temperature",
+        "max_tokens": "max_tokens",
+        "top_p": "top_p",
+        "stop": "stop_sequences",  # Claude uses stop_sequences
+    }
+
+    def normalize(self, request: UnifiedRequest) -> Dict[str, Any]:
+        """
+        Normalize unified request to Claude Messages API format.
+
+        Args:
+            request: Unified request object
+
+        Returns:
+            Dictionary with Claude-specific request parameters
+
+        Raises:
+            ValidationError: If request contains invalid parameters
+        """
+        self._validate_request(request)
+
+        # Separate system messages from conversation messages
+        system_messages = []
+        conversation_messages = []
+
+        for msg in request.messages:
+            if msg.role == "system":
+                system_messages.append(msg.content)
+            else:
+                conversation_messages.append(msg)
+
+        # Build base parameters
+        params: Dict[str, Any] = {}
+
+        # Add system instruction if present (Claude uses separate 'system' parameter)
+        if system_messages:
+            # Combine multiple system messages with newlines
+            params["system"] = "\n\n".join(system_messages)
+
+        # Normalize conversation messages (user/assistant only)
+        params["messages"] = self.normalize_messages(conversation_messages)
+
+        # Map parameters from unified format to Claude format
+        for unified_param, claude_param in self.PARAMETER_MAPPING.items():
+            value = getattr(request, unified_param, None)
+            if value is not None:
+                # Special handling for stop_sequences
+                if unified_param == "stop":
+                    # Convert single stop to list if needed
+                    if isinstance(value, str):
+                        params[claude_param] = [value]
+                    else:
+                        params[claude_param] = value
+                else:
+                    params[claude_param] = value
+
+        # Claude REQUIRES max_tokens - set default if not provided
+        if "max_tokens" not in params:
+            params["max_tokens"] = 4096  # Claude default
+
+        # Add Claude-specific parameters if present in request config
+        if hasattr(request, "provider_params") and request.provider_params:
+            # top_k is Claude-specific
+            if "top_k" in request.provider_params:
+                params["top_k"] = request.provider_params["top_k"]
+
+        # Handle streaming
+        if request.stream:
+            params["stream"] = True
+
+        return params
+
+    def normalize_messages(self, messages: List[Message]) -> List[Dict[str, Any]]:
+        """
+        Normalize messages to Claude format.
+
+        Claude requirements:
+        - Only user and assistant roles (system handled separately)
+        - No consecutive messages with same role
+        - Messages must alternate between user and assistant
+
+        Args:
+            messages: List of message objects (no system messages)
+
+        Returns:
+            List of Claude-formatted message dictionaries
+
+        Raises:
+            ValidationError: If messages violate Claude constraints
+        """
+        normalized_messages = []
+        last_role = None
+
+        for msg in messages:
+            # Skip system messages (already handled)
+            if msg.role == "system":
+                continue
+
+            # Map assistant role to assistant (same as OpenAI)
+            role = msg.role
+            if role not in ["user", "assistant"]:
+                raise ValidationError(
+                    f"Claude only supports 'user' and 'assistant' roles, got: {role}"
+                )
+
+            # Check for consecutive same-role messages
+            if last_role == role:
+                raise ValidationError(
+                    f"Claude does not support consecutive messages with the same role. "
+                    f"Found consecutive '{role}' messages. Messages must alternate between "
+                    f"user and assistant."
+                )
+
+            normalized_msg = {"role": role, "content": msg.content}
+
+            normalized_messages.append(normalized_msg)
+            last_role = role
+
+        return normalized_messages
+
+    def validate_model_support(self, model: str) -> bool:
+        """
+        Check if a model is supported by Claude.
+
+        Args:
+            model: Model name to validate
+
+        Returns:
+            True if model is supported
+
+        Note:
+            This is a basic check. Full validation should be done
+            by the ModelValidator in utils/validators.py
+        """
+        supported_models = [
+            "claude-3-opus",
+            "claude-3-sonnet",
+            "claude-3-haiku",
+            "claude-3-5-sonnet",
+            "claude-3-5-haiku",
+        ]
+        return any(model.startswith(prefix) for prefix in supported_models)
