@@ -4,17 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flexiai"
-version = "0.1.0"
+version = "0.3.0"
 description = "A unified interface for multiple GenAI providers with automatic failover"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
-keywords = ["ai", "genai", "openai", "gemini", "claude", "llm", "failover", "circuit-breaker"]
+keywords = ["ai", "genai", "openai", "gemini", "claude", "anthropic", "vertexai", "llm", "failover", "circuit-breaker", "multi-provider"]
 authors = [
     {name = "FlexiAI Contributors"}
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "License :: OSI Approved :: MIT License",
@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
     "openai>=1.0.0",
     "google-genai>=0.1.0",
+    "anthropic>=0.7.0",
     "pydantic>=2.0.0",
     "tenacity>=8.0.0",
     "python-dotenv>=1.0.0",

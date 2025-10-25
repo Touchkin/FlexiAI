@@ -14,7 +14,7 @@ long_description = (
 
 setup(
     name="flexiai",
-    version="0.1.0",
+    version="0.3.0",
     author="FlexiAI Contributors",
     author_email="",
     description="A unified interface for multiple GenAI providers with automatic failover",
@@ -45,6 +45,7 @@ setup(
     install_requires=[
         "openai>=1.0.0",
         "google-genai>=0.1.0",
+        "anthropic>=0.7.0",
         "pydantic>=2.0.0",
         "tenacity>=8.0.0",
         "python-dotenv>=1.0.0",
