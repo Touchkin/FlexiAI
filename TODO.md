@@ -16,7 +16,8 @@
   - ✅ Phase 2.5: Client Multi-Provider Update
   - ⏳ Phase 2.6: Unit Tests (some fixes needed)
   - ✅ Phase 2.7: Integration Tests (ready for API key)
-  - ⬜ Phase 2.8: Documentation Update
+  - ✅ Phase 2.8: Vertex AI Provider (NEW - Complete!)
+  - ⬜ Phase 2.9: Documentation Update
 
 ### ✅ Completed
 - [x] Phase 1.1: Project Setup (100% Complete!)
@@ -98,12 +99,23 @@
   - [x] 39 tests created (19 normalizer + 10 provider + 10 integration)
   - [x] Unit tests for normalizers (12/19 passing, minor fixes needed)
   - [x] Integration tests ready (requires GEMINI_API_KEY)
+- [x] Phase 2.8: Vertex AI Provider (100% Complete!)
+  - [x] Created VertexAIProvider class (370 lines)
+  - [x] Uses Google Cloud ADC (Application Default Credentials)
+  - [x] Supports GCP project and location configuration
+  - [x] Reuses Gemini normalizers (same API format)
+  - [x] 19 comprehensive unit tests
+  - [x] 10 integration tests (requires GOOGLE_CLOUD_PROJECT)
+  - [x] Updated validators for Vertex AI models
+  - [x] Updated client to support vertexai provider
+  - [x] Added to provider registry
 
 ### 📋 Next Up
-- [ ] Phase 2.7: Documentation Update
-  - [ ] Update README with Gemini examples
-  - [ ] Create example files
-  - [ ] Update API reference
+- [ ] Phase 2.9: Documentation Update
+  - [ ] Update README with Gemini and Vertex AI examples
+  - [ ] Create example files for both providers
+  - [ ] Update API reference with Vertex AI
+  - [ ] Document GCP authentication setup
 - [ ] Phase 3: Anthropic Claude Integration
   - [ ] Phase 3.1: Claude Provider Research
   - [ ] Phase 3.2-3.7: Full Claude implementation

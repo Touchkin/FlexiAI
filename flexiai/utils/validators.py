@@ -115,6 +115,23 @@ class ModelValidator:
             "gemini-pro-vision",
             "gemini-ultra",
         ],
+        "vertexai": [
+            # Same models as Gemini (Vertex AI uses same models via GCP)
+            # Gemini 2.x models
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-pro",
+            # Gemini 1.x models (legacy)
+            "gemini-pro",
+            "gemini-pro-vision",
+            "gemini-ultra",
+            # Vertex AI also supports some additional models
+            "text-bison",
+            "chat-bison",
+            "codechat-bison",
+        ],
         "azure": [
             # Azure uses deployment names, so we allow any non-empty string
             "*",

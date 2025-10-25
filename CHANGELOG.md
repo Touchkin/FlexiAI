@@ -19,12 +19,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Safety ratings preservation in response metadata
   - 39 new tests (19 normalizer tests, 10 provider tests, 10 integration tests)
   - Integration tests ready for real Gemini API (requires GEMINI_API_KEY)
+- **Phase 2.8: Vertex AI Provider (Complete)**
+  - Implemented `VertexAIProvider` class for Google Vertex AI integration
+  - Uses Google Cloud Application Default Credentials (ADC) instead of API keys
+  - Support for GCP project and location configuration
+  - Reuses Gemini normalizers (same API format as Gemini)
+  - Support for Vertex AI specific models (text-bison, chat-bison, codechat-bison)
+  - 19 comprehensive unit tests for Vertex AI provider
+  - 10 integration tests (requires GOOGLE_CLOUD_PROJECT env var)
+  - Multi-provider support: OpenAI + Gemini + Vertex AI
+  - Automatic failover across all three providers
 
 ### Changed
 - Updated `ModelValidator` to support Gemini models (gemini-2.5, gemini-2.0, gemini-1.5, gemini-pro)
+- Updated `ModelValidator` to support Vertex AI models (same as Gemini + text-bison, chat-bison, codechat-bison)
 - Updated `APIKeyValidator` to validate Gemini API keys
-- Enhanced `FlexiAI` client to support multiple providers simultaneously
-- Updated provider registry to handle Gemini provider
+- Enhanced `FlexiAI` client to support multiple providers simultaneously (OpenAI, Gemini, Vertex AI)
+- Updated provider registry to handle Gemini and Vertex AI providers
+- Updated `ProviderConfig` validator to include "vertexai" as supported provider
 
 ### Fixed
 - N/A

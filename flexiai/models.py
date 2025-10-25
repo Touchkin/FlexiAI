@@ -237,7 +237,7 @@ class ProviderConfig(BaseModel):
     @classmethod
     def validate_name(cls, v: str) -> str:
         """Validate provider name is one of the supported providers."""
-        supported = ["openai", "gemini", "anthropic", "azure", "bedrock"]
+        supported = ["openai", "gemini", "vertexai", "anthropic", "azure", "bedrock"]
         if v.lower() not in supported:
             raise ValueError(f"Provider '{v}' not supported. Supported providers: {supported}")
         return v.lower()
