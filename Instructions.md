@@ -1196,7 +1196,6 @@ Response:
 - Include code example in announcement
 - Add GIF/video demo if possible
 - Provide installation instructions
-- Link to documentation
 
 ---
 
