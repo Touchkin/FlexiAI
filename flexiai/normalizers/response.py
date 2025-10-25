@@ -114,8 +114,9 @@ class OpenAIResponseNormalizer(ResponseNormalizer):
         # Extract content
         content = self._extract_content(choice)
 
-        # Extract model (from response or parameter)
-        response_model = response.get("model", model)
+        # Extract model (prefer parameter over response)
+        # This allows provider to override response model with config model
+        response_model = model if model else response.get("model", "")
         if not response_model:
             raise InvalidResponseError("Model name must be provided or in response")
 
