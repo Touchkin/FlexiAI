@@ -98,28 +98,46 @@ class VertexAIProvider(BaseProvider):
         """
         Initialize the Vertex AI client.
 
-        Uses Google Cloud Application Default Credentials (ADC) for authentication.
+        Supports two authentication methods:
+        1. API Key (if api_key is provided and not "not-used")
+        2. Google Cloud Application Default Credentials (ADC)
 
         Raises:
             AuthenticationError: If credentials are not available
         """
         try:
-            # Initialize the client with Vertex AI endpoints
-            self.client = genai.Client(
-                vertexai=True,
-                project=self.project,
-                location=self.location,
-                # credentials=None means use ADC
-            )
-            self.logger.debug(
-                f"Vertex AI client initialized successfully for project: {self.project}"
-            )
+            # Check if API key is provided (and not placeholder)
+            api_key = self.config.api_key
+            if api_key and api_key != "not-used" and not api_key.startswith("not-"):
+                # Use API key authentication (Vertex AI in Express mode)
+                self.logger.debug("Initializing Vertex AI client with API key")
+                self.client = genai.Client(
+                    vertexai=True,
+                    project=self.project,
+                    location=self.location,
+                    api_key=api_key,
+                )
+                self.logger.debug(
+                    f"Vertex AI client initialized with API key for project: {self.project}"
+                )
+            else:
+                # Use Application Default Credentials (ADC)
+                self.logger.debug("Initializing Vertex AI client with ADC")
+                self.client = genai.Client(
+                    vertexai=True,
+                    project=self.project,
+                    location=self.location,
+                    # credentials=None means use ADC
+                )
+                self.logger.debug(
+                    f"Vertex AI client initialized with ADC for project: {self.project}"
+                )
         except Exception as e:
             raise AuthenticationError(
                 f"Failed to initialize Vertex AI client: {str(e)}. "
-                "Make sure you have valid Google Cloud credentials. "
-                "Run 'gcloud auth application-default login' or set "
-                "GOOGLE_APPLICATION_CREDENTIALS environment variable."
+                "Make sure you have either: "
+                "1. A valid GCP API key (set as api_key in config), or "
+                "2. Valid Google Cloud credentials (run 'gcloud auth application-default login')"
             ) from e
 
     def chat_completion(self, request: UnifiedRequest) -> UnifiedResponse:
