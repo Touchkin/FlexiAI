@@ -804,6 +804,19 @@ mypy flexiai
 flake8 flexiai tests
 ```
 
+### Building and Installing
+
+```bash
+# Install build tool
+pip install build
+
+# Build wheel package
+python -m build
+
+# Install the built package
+pip install dist/flexiai-*.whl
+```
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
