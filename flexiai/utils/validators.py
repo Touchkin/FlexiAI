@@ -28,7 +28,9 @@ class APIKeyValidator:
             r"^sk-[a-zA-Z0-9\-_]{20,}$"
         ),  # Updated to support new OpenAI key format with dashes
         "anthropic": re.compile(r"^sk-ant-[a-zA-Z0-9\-]{20,}$"),
-        "gemini": re.compile(r"^[a-zA-Z0-9\-_]{20,}$"),
+        "gemini": re.compile(
+            r"^AIza[a-zA-Z0-9\-_]{35}$|^[a-zA-Z0-9\-_]{20,}$"
+        ),  # Google API keys typically start with AIza
         "azure": re.compile(r"^[a-zA-Z0-9]{32}$"),
         "bedrock": re.compile(r"^[A-Z0-9]{20}$"),
     }
@@ -102,6 +104,13 @@ class ModelValidator:
             "claude-instant-1.2",
         ],
         "gemini": [
+            # Gemini 2.x models
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-pro",
+            # Gemini 1.x models (legacy)
             "gemini-pro",
             "gemini-pro-vision",
             "gemini-ultra",

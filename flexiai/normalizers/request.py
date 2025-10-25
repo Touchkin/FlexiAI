@@ -193,3 +193,164 @@ class OpenAIRequestNormalizer(RequestNormalizer):
             "o1",
         ]
         return any(model.startswith(prefix) for prefix in supported_prefixes)
+
+
+class GeminiRequestNormalizer(RequestNormalizer):
+    """
+    Request normalizer for Google Gemini API.
+
+    Gemini uses a different message format and parameter names compared to OpenAI:
+    - Role 'assistant' maps to 'model'
+    - Uses 'contents' instead of 'messages'
+    - max_tokens maps to maxOutputTokens in generationConfig
+    - System messages are passed via system_instruction parameter
+    """
+
+    # Parameter mapping from UnifiedRequest to Gemini generationConfig
+    PARAMETER_MAPPING = {
+        "temperature": "temperature",
+        "max_tokens": "maxOutputTokens",
+        "top_p": "topP",
+        "top_k": "topK",
+        "stop": "stopSequences",
+        "seed": "seed",
+        "presence_penalty": "presencePenalty",
+        "frequency_penalty": "frequencyPenalty",
+    }
+
+    # Gemini role mapping
+    ROLE_MAPPING = {
+        "system": None,  # System messages are handled separately
+        "user": "user",
+        "assistant": "model",  # Gemini uses 'model' instead of 'assistant'
+        "function": "function",  # Function results
+    }
+
+    def normalize(self, request: UnifiedRequest) -> Dict[str, Any]:
+        """
+        Normalize unified request to Gemini API format.
+
+        Args:
+            request: Unified request object
+
+        Returns:
+            Dictionary containing Gemini API request parameters
+
+        Raises:
+            ValidationError: If request is invalid
+
+        Example:
+            >>> normalizer = GeminiRequestNormalizer()
+            >>> request = UnifiedRequest(
+            ...     messages=[Message(role="user", content="Hello")],
+            ...     temperature=0.7,
+            ...     max_tokens=1000
+            ... )
+            >>> api_request = normalizer.normalize(request)
+        """
+        self._validate_request(request)
+
+        # Separate system messages from conversation messages
+        system_messages = [msg for msg in request.messages if msg.role == "system"]
+        conversation_messages = [msg for msg in request.messages if msg.role != "system"]
+
+        # Build normalized request
+        normalized = {}
+
+        # Add contents (conversation messages)
+        if conversation_messages:
+            normalized["contents"] = self.normalize_messages(conversation_messages)
+
+        # Handle system instructions (Gemini's way of handling system messages)
+        if system_messages:
+            # Combine all system messages into one system_instruction
+            system_content = " ".join(msg.content for msg in system_messages)
+            normalized["system_instruction"] = {"parts": [{"text": system_content}]}
+
+        # Build generationConfig for optional parameters
+        generation_config = {}
+        for unified_param, gemini_param in self.PARAMETER_MAPPING.items():
+            value = getattr(request, unified_param, None)
+            if value is not None:
+                generation_config[gemini_param] = value
+
+        if generation_config:
+            normalized["generationConfig"] = generation_config
+
+        # Handle safety settings if provided in extra parameters
+        # (This is optional - we can add default safety settings if needed)
+        if hasattr(request, "safety_settings"):
+            normalized["safetySettings"] = request.safety_settings
+
+        return normalized
+
+    def normalize_messages(self, messages: List[Message]) -> List[Dict[str, Any]]:
+        """
+        Normalize messages to Gemini format.
+
+        Gemini uses a different structure:
+        - role: 'user' or 'model' (not 'assistant')
+        - parts: list of content parts (text, images, etc.)
+
+        Args:
+            messages: List of unified message objects (excluding system messages)
+
+        Returns:
+            List of Gemini-formatted message dictionaries
+
+        Raises:
+            ValidationError: If messages contain invalid data
+
+        Example:
+            >>> normalizer = GeminiRequestNormalizer()
+            >>> messages = [
+            ...     Message(role="user", content="Hello"),
+            ...     Message(role="assistant", content="Hi there!")
+            ... ]
+            >>> gemini_messages = normalizer.normalize_messages(messages)
+        """
+        if not messages:
+            raise ValidationError("Messages list cannot be empty")
+
+        normalized_messages = []
+        for msg in messages:
+            # Map role to Gemini format
+            gemini_role = self.ROLE_MAPPING.get(msg.role)
+
+            if gemini_role is None:
+                # Skip system messages (they're handled separately)
+                continue
+
+            # Build Gemini message format
+            normalized_msg = {"role": gemini_role, "parts": [{"text": msg.content}]}
+
+            # Note: Gemini supports multimodal parts (images, etc.)
+            # For now, we're only supporting text content
+            # Future enhancement: support images and other modalities
+
+            normalized_messages.append(normalized_msg)
+
+        return normalized_messages
+
+    def validate_model_support(self, model: str) -> bool:
+        """
+        Check if a model is supported by Gemini.
+
+        Args:
+            model: Model name to validate
+
+        Returns:
+            True if model is supported
+
+        Note:
+            This is a basic check. Full validation should be done
+            by the ModelValidator in utils/validators.py
+        """
+        supported_prefixes = [
+            "gemini-2.5",
+            "gemini-2.0",
+            "gemini-1.5",
+            "gemini-pro",
+            "gemini-ultra",
+        ]
+        return any(model.startswith(prefix) for prefix in supported_prefixes)

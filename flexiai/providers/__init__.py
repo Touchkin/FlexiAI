@@ -1,7 +1,13 @@
 """Provider implementations for different GenAI services."""
 
 from flexiai.providers.base import BaseProvider
+from flexiai.providers.gemini_provider import GeminiProvider
 from flexiai.providers.openai_provider import OpenAIProvider
 from flexiai.providers.registry import ProviderRegistry
 
-__all__ = ["BaseProvider", "OpenAIProvider", "ProviderRegistry"]
+__all__ = [
+    "BaseProvider",
+    "OpenAIProvider",
+    "GeminiProvider",
+    "ProviderRegistry",
+]
