@@ -56,7 +56,8 @@ class VertexAIProvider(BaseProvider):
 
         Args:
             config: Provider configuration with project and location info
-                   - config.config['project']: GCP project ID (optional, can use env var)
+                   - config.api_key: GCP API key (for API key auth) OR set to "not-used" for ADC
+                   - config.config['project']: GCP project ID (required for ADC, optional for API key)
                    - config.config['location']: GCP region (optional, default: us-central1)
 
         Raises:
@@ -71,11 +72,17 @@ class VertexAIProvider(BaseProvider):
             "GOOGLE_CLOUD_LOCATION", "us-central1"
         )
 
+        # Check if using API key authentication
+        api_key = config.api_key
+        using_api_key = api_key and api_key != "not-used" and not api_key.startswith("not-")
+
         # Validate required config
-        if not self.project:
+        # Project is only required when using ADC (not API key)
+        if not using_api_key and not self.project:
             raise ValidationError(
-                "GCP project ID is required for Vertex AI. "
-                "Set 'project' in config or GOOGLE_CLOUD_PROJECT environment variable."
+                "GCP project ID is required for Vertex AI when using ADC. "
+                "Set 'project' in config or GOOGLE_CLOUD_PROJECT environment variable. "
+                "Or provide an API key for authentication."
             )
 
         # Now initialize parent class (which will call validate_credentials)
@@ -89,36 +96,54 @@ class VertexAIProvider(BaseProvider):
         self.client: genai.Client = None
         self._initialize_client()
 
-        self.logger.info(
-            f"Initialized Vertex AI provider with model: {self.config.model}, "
-            f"project: {self.project}, location: {self.location}"
-        )
+        if using_api_key:
+            self.logger.info(
+                f"Initialized Vertex AI provider with model: {self.config.model} (API key auth)"
+            )
+        else:
+            self.logger.info(
+                f"Initialized Vertex AI provider with model: {self.config.model}, "
+                f"project: {self.project}, location: {self.location}"
+            )
 
     def _initialize_client(self) -> None:
         """
         Initialize the Vertex AI client.
 
-        Supports two authentication methods:
-        1. API Key (if api_key is provided and not "not-used")
+        Supports multiple authentication methods:
+        1. Service Account JSON file (via GOOGLE_APPLICATION_CREDENTIALS env var or config)
         2. Google Cloud Application Default Credentials (ADC)
 
         Raises:
             AuthenticationError: If credentials are not available
         """
         try:
-            # Check if API key is provided (and not placeholder)
-            api_key = self.config.api_key
-            if api_key and api_key != "not-used" and not api_key.startswith("not-"):
-                # Use API key authentication (Vertex AI in Express mode)
-                self.logger.debug("Initializing Vertex AI client with API key")
+            # Check for service account credentials
+            service_account_path = (
+                self.config.config.get("service_account_file")
+                or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            )
+
+            if service_account_path:
+                # Use service account file
+                self.logger.debug(f"Initializing Vertex AI with service account: {service_account_path}")
+                
+                # Load credentials from service account file
+                from google.oauth2 import service_account
+                
+                credentials = service_account.Credentials.from_service_account_file(
+                    service_account_path,
+                    scopes=['https://www.googleapis.com/auth/cloud-platform']
+                )
+                
                 self.client = genai.Client(
                     vertexai=True,
                     project=self.project,
                     location=self.location,
-                    api_key=api_key,
+                    credentials=credentials,
                 )
                 self.logger.debug(
-                    f"Vertex AI client initialized with API key for project: {self.project}"
+                    f"Vertex AI client initialized with service account for project: {self.project}"
                 )
             else:
                 # Use Application Default Credentials (ADC)
@@ -136,7 +161,7 @@ class VertexAIProvider(BaseProvider):
             raise AuthenticationError(
                 f"Failed to initialize Vertex AI client: {str(e)}. "
                 "Make sure you have either: "
-                "1. A valid GCP API key (set as api_key in config), or "
+                "1. A valid service account JSON file (set GOOGLE_APPLICATION_CREDENTIALS env var or 'service_account_file' in config), or "
                 "2. Valid Google Cloud credentials (run 'gcloud auth application-default login')"
             ) from e
 
@@ -336,8 +361,8 @@ class VertexAIProvider(BaseProvider):
         """
         Validate Vertex AI credentials.
 
-        For Vertex AI, we check if the project ID is set. Actual credential
-        validation happens during client initialization.
+        For API key mode: Check that API key exists
+        For ADC mode: Check that project ID is set
 
         Returns:
             True if credentials configuration is valid
@@ -346,12 +371,19 @@ class VertexAIProvider(BaseProvider):
             AuthenticationError: If credentials are invalid
         """
         try:
-            # For Vertex AI, check that project is set
-            if not self.project:
-                raise ValidationError("GCP project ID is required for Vertex AI")
+            # Check if using API key
+            api_key = self.config.api_key
+            using_api_key = api_key and api_key != "not-used" and not api_key.startswith("not-")
 
-            # If client exists, it means initialization succeeded
-            # If not, credentials will be validated during _initialize_client
+            if using_api_key:
+                # API key mode - just verify key exists
+                if not api_key or len(api_key) < 20:
+                    raise ValidationError("Invalid GCP API key")
+            else:
+                # ADC mode - check that project is set
+                if not self.project:
+                    raise ValidationError("GCP project ID is required for Vertex AI with ADC")
+
             return True
         except ValidationError as e:
             raise AuthenticationError(f"Invalid Vertex AI configuration: {str(e)}") from e
