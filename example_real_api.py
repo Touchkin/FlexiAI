@@ -8,7 +8,16 @@ Make sure you have set your OPENAI_API_KEY environment variable:
 Or you can pass it directly in the config (not recommended for production).
 """
 
+import os
+
 from flexiai import FlexiAI, FlexiAIConfig, ProviderConfig
+
+# Get API key from environment
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    print("ERROR: OPENAI_API_KEY environment variable not set!")
+    print("Please run: export OPENAI_API_KEY='your-api-key-here'")
+    exit(1)
 
 # Option 1: Simple initialization (uses OPENAI_API_KEY from environment)
 print("=" * 60)
@@ -20,10 +29,11 @@ config = FlexiAIConfig(
         ProviderConfig(
             name="openai",
             priority=1,
-            # api_key="your-key-here",  # Optional: set directly (not recommended)
+            api_key=api_key,  # Read from environment
+            model="gpt-4.1-nano-2025-04-14",  # Using the recommended nano model
         )
     ],
-    default_model="gpt-3.5-turbo",  # Use a cheaper model for testing
+    default_model="gpt-4.1-nano-2025-04-14",
     default_temperature=0.7,
     default_max_tokens=150,
 )
@@ -70,9 +80,12 @@ print("\n4. Provider Status:")
 print("-" * 60)
 status = client.get_provider_status("openai")
 print(f"Provider: {status['name']}")
-print(f"Available: {status['available']}")
+print(f"Model: {status['model']}")
+print(f"Priority: {status['priority']}")
+print(f"Status: {status['status']}")
 print(f"Circuit breaker state: {status['circuit_breaker']['state']}")
 print(f"Failure count: {status['circuit_breaker']['failure_count']}")
+print(f"Success count: {status['circuit_breaker']['success_count']}")
 
 print("\n" + "=" * 60)
 print("Test complete!")

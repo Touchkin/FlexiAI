@@ -24,7 +24,9 @@ class APIKeyValidator:
 
     # API key patterns for different providers
     PATTERNS = {
-        "openai": re.compile(r"^sk-[a-zA-Z0-9]{20,}$"),
+        "openai": re.compile(
+            r"^sk-[a-zA-Z0-9\-_]{20,}$"
+        ),  # Updated to support new OpenAI key format with dashes
         "anthropic": re.compile(r"^sk-ant-[a-zA-Z0-9\-]{20,}$"),
         "gemini": re.compile(r"^[a-zA-Z0-9\-_]{20,}$"),
         "azure": re.compile(r"^[a-zA-Z0-9]{32}$"),
