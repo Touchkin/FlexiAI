@@ -4,6 +4,11 @@
 
 The circuit breaker pattern in FlexiAI protects your application from cascading failures by detecting broken providers and enabling automatic failover. This guide shows you how to test it.
 
+> **📘 Related Documentation:**
+> - For detailed explanation of how primary failback works, see **[PRIMARY_FAILBACK_GUIDE.md](PRIMARY_FAILBACK_GUIDE.md)**
+> - For general usage, see README.md "Testing Circuit Breaker" section
+> - For examples, see `examples/circuit_breaker_test.py`
+
 ## How We Tested Circuit Breaker
 
 ### Integration Test Results
