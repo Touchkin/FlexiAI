@@ -9,27 +9,39 @@ __version__ = "0.1.0"
 __author__ = "FlexiAI Contributors"
 
 from flexiai.client import FlexiAI
-from flexiai.config import FlexiAIConfig, ProviderConfig, CircuitBreakerConfig
 from flexiai.exceptions import (
+    AllProvidersFailedError,
+    CircuitBreakerOpenError,
+    ConfigurationError,
     FlexiAIException,
     ProviderException,
-    ConfigurationError,
-    CircuitBreakerOpenError,
-    AllProvidersFailedError,
     ValidationError,
-    AuthenticationError,
+)
+from flexiai.models import (
+    CircuitBreakerConfig,
+    FlexiAIConfig,
+    LoggingConfig,
+    ProviderConfig,
+    RetryConfig,
+    UnifiedRequest,
+    UnifiedResponse,
 )
 
 __all__ = [
+    "__version__",
+    "__author__",
     "FlexiAI",
     "FlexiAIConfig",
     "ProviderConfig",
     "CircuitBreakerConfig",
+    "RetryConfig",
+    "LoggingConfig",
+    "UnifiedRequest",
+    "UnifiedResponse",
     "FlexiAIException",
     "ProviderException",
     "ConfigurationError",
+    "ValidationError",
     "CircuitBreakerOpenError",
     "AllProvidersFailedError",
-    "ValidationError",
-    "AuthenticationError",
 ]
