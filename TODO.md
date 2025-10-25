@@ -1,23 +1,31 @@
 # FlexiAI Development TODO
 
-## 📍 Current Phase: Phase 2 - Google Gemini Integration (In Progress)
+## 📍 Current Phase: Phase 2.9 - Documentation Update (In Progress)
 
 ### 🎯 Current Objectives
-- Complete Gemini provider implementation
-- Test multi-provider failover (OpenAI → Gemini)
-- Update documentation with Gemini examples
+- Document Gemini and Vertex AI providers
+- Update all documentation with multi-provider examples
+- Create comprehensive example files
+- Complete Phase 2 (Google Gemini & Vertex AI Integration)
 
 ### 🔄 In Progress
-- Phase 2: Google Gemini Integration
+- Phase 2.9: Documentation Update
+  - [ ] Update README.md with Gemini and Vertex AI
+  - [ ] Create example files (gemini_basic.py, vertexai_basic.py, multi_provider_failover.py)
+  - [ ] Update docs/api-reference.md with new providers
+  - [ ] Update docs/configuration.md with GCP authentication
+  - [ ] Add troubleshooting section for all providers
+
+### ✅ Recently Completed
+- Phase 2: Google Gemini & Vertex AI Integration
   - ✅ Phase 2.1: Dependencies and Setup
   - ✅ Phase 2.2: Gemini Request Normalizer
   - ✅ Phase 2.3: Gemini Response Normalizer
   - ✅ Phase 2.4: Gemini Provider Implementation
   - ✅ Phase 2.5: Client Multi-Provider Update
-  - ⏳ Phase 2.6: Unit Tests (some fixes needed)
+  - ⏳ Phase 2.6: Unit Tests (10/18 passing, minor fixes needed)
   - ✅ Phase 2.7: Integration Tests (ready for API key)
-  - ✅ Phase 2.8: Vertex AI Provider (NEW - Complete!)
-  - ⬜ Phase 2.9: Documentation Update
+  - ✅ Phase 2.8: Vertex AI Provider (100% Complete - Successfully tested!)
 
 ### ✅ Completed
 - [x] Phase 1.1: Project Setup (100% Complete!)
@@ -111,11 +119,9 @@
   - [x] Added to provider registry
 
 ### 📋 Next Up
-- [ ] Phase 2.9: Documentation Update
-  - [ ] Update README with Gemini and Vertex AI examples
-  - [ ] Create example files for both providers
-  - [ ] Update API reference with Vertex AI
-  - [ ] Document GCP authentication setup
+- [ ] Complete Phase 2.9: Documentation Update (Current)
+- [ ] Fix remaining unit tests (8 tests in test_vertexai_provider.py, 7 in test_gemini_normalizers.py)
+- [ ] Test Gemini integration with real API key
 - [ ] Phase 3: Anthropic Claude Integration
   - [ ] Phase 3.1: Claude Provider Research
   - [ ] Phase 3.2-3.7: Full Claude implementation
@@ -464,28 +470,35 @@
   - [x] Skip markers for tests requiring API key
   - ✅ Ready to run with GEMINI_API_KEY
 
-### Phase 2.7: Documentation Update ⏳ (0% Complete)
-- [ ] Update README with Gemini support
-  - [ ] Add Gemini to features list
-  - [ ] Add Gemini installation instructions
-  - [ ] Add Gemini usage example
-  - [ ] Add multi-provider failover example
-- [ ] Add Gemini configuration examples
-  - [ ] Single Gemini provider example
-  - [ ] OpenAI + Gemini failover example
-  - [ ] Configuration with all parameters
-- [ ] Update API reference
-  - [ ] Document GeminiProvider
-  - [ ] Document Gemini-specific parameters
-  - [ ] Document safety settings
-- [ ] Create examples
-  - [ ] Create `examples/gemini_example.py`
-  - [ ] Create `examples/multi_provider_failover.py`
-  - [ ] Update examples/README.md
-- [ ] Add Gemini-specific troubleshooting
-  - [ ] API key format
+### Phase 2.9: Documentation Update ⏳ (0% Complete)
+- [ ] Update README.md with Gemini and Vertex AI support
+  - [ ] Add Gemini and Vertex AI to features list
+  - [ ] Add installation instructions for google-genai
+  - [ ] Add Gemini Developer API usage example
+  - [ ] Add Vertex AI usage example (service account)
+  - [ ] Add multi-provider failover example (OpenAI → Gemini → Vertex AI)
+  - [ ] Document authentication methods for each provider
+- [ ] Create comprehensive example files
+  - [ ] `examples/gemini_basic.py` - Gemini Developer API examples
+  - [ ] `examples/vertexai_basic.py` - Vertex AI examples with service account
+  - [ ] `examples/multi_provider_failover.py` - 3-provider failover demo
+  - [ ] Update `examples/README.md` with new examples
+- [ ] Update docs/api-reference.md
+  - [ ] Document GeminiProvider class
+  - [ ] Document VertexAIProvider class
+  - [ ] Document Gemini-specific parameters (safety_settings, etc.)
+  - [ ] Document Vertex AI-specific parameters (project, location, service_account_file)
+- [ ] Update docs/configuration.md
+  - [ ] Add Gemini configuration examples
+  - [ ] Add Vertex AI configuration examples
+  - [ ] Document GCP authentication setup (service account, ADC)
+  - [ ] Add security best practices for credentials
+- [ ] Add troubleshooting section
+  - [ ] Gemini API key format and common errors
+  - [ ] Vertex AI authentication issues
   - [ ] Safety filter handling
-  - [ ] Common error messages
+  - [ ] GCP project/location configuration
+  - [ ] Service account permissions
 
 ---
 
