@@ -411,6 +411,212 @@ ProviderConfig(
 - [Configuration Guide](docs/configuration.md) - Advanced configuration options
 - [Examples](examples/) - Code examples and tutorials
 
+## 🔧 Troubleshooting
+
+### OpenAI Issues
+
+#### Invalid API Key
+```
+Error: AuthenticationError: Incorrect API key provided
+```
+**Solution**: 
+- Verify API key starts with `sk-proj-` or `sk-`
+- Check at https://platform.openai.com/api-keys
+- Ensure no extra spaces or newlines in the key
+
+#### Rate Limiting
+```
+Error: RateLimitError: You exceeded your current quota
+```
+**Solution**:
+- Check your OpenAI account billing at https://platform.openai.com/account/billing
+- Upgrade your plan or add payment method
+- Implement exponential backoff (built into FlexiAI)
+
+### Google Gemini Issues
+
+#### Invalid Gemini API Key
+```
+Error: 401 UNAUTHENTICATED
+```
+**Solution**:
+- Verify API key starts with `AIza`
+- Get a valid key from https://aistudio.google.com/app/apikey
+- Ensure API key is enabled for Gemini API
+
+#### Safety Filter Blocking
+```
+Error: Response blocked due to safety filters
+```
+**Solution**:
+- Content triggered safety filters (hate speech, dangerous content, etc.)
+- Rephrase your prompt to avoid sensitive topics
+- Check `response.metadata.get('safety_ratings')` for details
+- Gemini has stricter safety settings than other providers
+
+#### Model Not Found
+```
+Error: Model gemini-xxx not found
+```
+**Solution**:
+- Use supported models: `gemini-2.0-flash`, `gemini-1.5-pro`, `gemini-1.5-flash`
+- Check model availability in your region
+- Some models require API allowlisting
+
+### Google Vertex AI Issues
+
+#### Authentication Failed
+```
+Error: 401 UNAUTHENTICATED
+```
+**Solution**:
+
+**For Service Account**:
+```bash
+# Verify file exists
+ls -l /path/to/service-account.json
+
+# Check file permissions
+chmod 600 /path/to/service-account.json
+
+# Verify JSON format
+python -m json.tool service-account.json
+```
+
+**For ADC**:
+```bash
+# Re-authenticate
+gcloud auth application-default login
+
+# Verify authentication
+gcloud auth application-default print-access-token
+
+# Set project
+gcloud config set project YOUR_PROJECT_ID
+```
+
+#### API Not Enabled
+```
+Error: Vertex AI API has not been used in project xxx before or it is disabled
+```
+**Solution**:
+```bash
+# Enable Vertex AI API
+gcloud services enable aiplatform.googleapis.com --project=YOUR_PROJECT_ID
+
+# Or visit: https://console.cloud.google.com/apis/library/aiplatform.googleapis.com
+```
+
+#### Permission Denied
+```
+Error: 403 PERMISSION_DENIED
+```
+**Solution**:
+- Grant "Vertex AI User" role to your service account:
+```bash
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:YOUR_SERVICE_ACCOUNT@PROJECT.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+```
+
+#### Wrong Project or Location
+```
+Error: Project not found or Location not supported
+```
+**Solution**:
+- Verify project ID: `gcloud projects list`
+- Check supported locations: us-central1, us-east1, europe-west1, asia-northeast1
+- Ensure project has billing enabled
+
+#### API Keys Not Supported
+```
+Error: API keys are not supported by this API
+```
+**Solution**:
+- Vertex AI requires OAuth2, not API keys
+- Use service account file or ADC
+- Don't try to use Gemini API keys with Vertex AI
+
+### Multi-Provider Failover Issues
+
+#### All Providers Failed
+```
+Error: AllProvidersFailedError: All configured providers failed
+```
+**Solution**:
+- Check each provider's credentials individually
+- Verify network connectivity
+- Review circuit breaker status: `client.get_provider_status()`
+- Reset circuit breakers: `client.reset_circuit_breakers()`
+
+#### Circuit Breaker Always Open
+```
+Warning: Circuit breaker open, skipping provider
+```
+**Solution**:
+- Check provider health: `client.get_provider_status()`
+- Wait for recovery timeout (default: 60 seconds)
+- Manually reset: `client.reset_circuit_breakers()`
+- Adjust threshold: `CircuitBreakerConfig(failure_threshold=10)`
+
+### Common Configuration Issues
+
+#### Environment Variables Not Loaded
+```python
+# ❌ Wrong
+api_key = "$OPENAI_API_KEY"  # Literal string, not the value!
+
+# ✅ Correct
+import os
+api_key = os.getenv("OPENAI_API_KEY")
+```
+
+#### Mixing Provider Types
+```python
+# ❌ Wrong - Using Gemini key with Vertex AI
+ProviderConfig(
+    name="vertexai",
+    api_key="AIza...",  # Gemini API key won't work!
+    ...
+)
+
+# ✅ Correct - Vertex AI needs service account
+ProviderConfig(
+    name="vertexai",
+    api_key="not-used",
+    config={"service_account_file": "..."}
+)
+```
+
+### Getting Help
+
+If you're still experiencing issues:
+
+1. **Check logs**: Enable debug logging
+   ```python
+   import logging
+   logging.basicConfig(level=logging.DEBUG)
+   ```
+
+2. **Verify installation**:
+   ```bash
+   pip show flexiai
+   pip list | grep -E "(openai|google-genai|google-auth)"
+   ```
+
+3. **Test providers individually**:
+   ```python
+   # Test each provider separately first
+   config = FlexiAIConfig(providers=[single_provider])
+   ```
+
+4. **Open an issue**: Include:
+   - FlexiAI version
+   - Python version
+   - Provider being used
+   - Error message and stack trace (remove API keys!)
+   - Minimal code to reproduce
+
 ## 🧪 Development
 
 ### Setup

@@ -126,6 +126,219 @@ ProviderConfig(
 )
 ```
 
+### Google Gemini Configuration
+
+Google offers two ways to access Gemini models: Gemini Developer API and Vertex AI.
+
+#### Gemini Developer API (API Key)
+
+Simple API key authentication for individual developers:
+
+```python
+ProviderConfig(
+    name="gemini",
+    priority=1,
+    api_key="AIza-your-api-key",  # Get from https://aistudio.google.com/app/apikey
+    model="gemini-2.0-flash",
+    config={
+        "timeout": 30,
+        "max_retries": 3
+    }
+)
+```
+
+**Environment Variables**:
+```bash
+export GEMINI_API_KEY="AIza-your-key"
+```
+
+```python
+import os
+
+ProviderConfig(
+    name="gemini",
+    priority=1,
+    api_key=os.getenv("GEMINI_API_KEY"),
+    model="gemini-2.0-flash"
+)
+```
+
+### Google Vertex AI Configuration
+
+Enterprise-grade GCP integration with OAuth2 authentication.
+
+#### Option 1: Service Account (Production)
+
+**Recommended for production deployments**.
+
+```python
+ProviderConfig(
+    name="vertexai",
+    api_key="not-used",  # Vertex AI doesn't use API keys
+    model="gemini-2.0-flash",
+    priority=1,
+    config={
+        "project": "your-gcp-project-id",
+        "location": "us-central1",
+        "service_account_file": "/path/to/service-account.json",
+        "timeout": 30,
+        "max_retries": 3
+    }
+)
+```
+
+**Environment Variables**:
+```bash
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+```
+
+```python
+import os
+import json
+
+# Read project ID from service account file
+with open(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"), 'r') as f:
+    service_account = json.load(f)
+    project_id = service_account.get('project_id')
+
+ProviderConfig(
+    name="vertexai",
+    api_key="not-used",
+    model="gemini-2.0-flash",
+    config={
+        "project": project_id,
+        "location": "us-central1",
+        "service_account_file": os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    }
+)
+```
+
+#### Option 2: Application Default Credentials (Development)
+
+**Recommended for local development**.
+
+**Setup**:
+```bash
+# Authenticate with gcloud
+gcloud auth application-default login
+
+# Set project
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+```
+
+**Configuration**:
+```python
+import os
+
+ProviderConfig(
+    name="vertexai",
+    api_key="not-used",
+    model="gemini-2.0-flash",
+    config={
+        "project": os.getenv("GOOGLE_CLOUD_PROJECT"),
+        "location": "us-central1"
+        # Will use ADC automatically
+    }
+)
+```
+
+#### GCP Region Configuration
+
+Choose the region closest to your users for lower latency:
+
+```python
+# US regions
+config={"project": "...", "location": "us-central1"}  # Iowa (default)
+config={"project": "...", "location": "us-east1"}     # South Carolina
+config={"project": "...", "location": "us-west1"}     # Oregon
+
+# Europe regions
+config={"project": "...", "location": "europe-west1"}  # Belgium
+config={"project": "...", "location": "europe-west4"}  # Netherlands
+
+# Asia regions
+config={"project": "...", "location": "asia-northeast1"}  # Tokyo
+config={"project": "...", "location": "asia-southeast1"}  # Singapore
+```
+
+#### Multi-Provider with Gemini and Vertex AI
+
+```python
+config = FlexiAIConfig(
+    providers=[
+        # Primary: OpenAI
+        ProviderConfig(
+            name="openai",
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model="gpt-4o-mini",
+            priority=1
+        ),
+        # Fallback 1: Gemini Developer API
+        ProviderConfig(
+            name="gemini",
+            api_key=os.getenv("GEMINI_API_KEY"),
+            model="gemini-2.0-flash",
+            priority=2
+        ),
+        # Fallback 2: Vertex AI (GCP)
+        ProviderConfig(
+            name="vertexai",
+            api_key="not-used",
+            model="gemini-2.0-flash",
+            priority=3,
+            config={
+                "project": os.getenv("GOOGLE_CLOUD_PROJECT"),
+                "location": "us-central1",
+                "service_account_file": os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            }
+        )
+    ]
+)
+```
+
+#### Security Best Practices for GCP
+
+⚠️ **Critical Security Guidelines**:
+
+1. **Never commit credentials to version control**:
+   ```bash
+   # Add to .gitignore
+   *.json
+   !package.json
+   !tsconfig.json
+   service-account*.json
+   dev-*.json
+   .env
+   .env.*
+   ```
+
+2. **Store service accounts securely**:
+   - Use GCP Secret Manager in production
+   - Use environment variables for file paths
+   - Restrict file permissions: `chmod 600 service-account.json`
+
+3. **Use IAM with minimum permissions**:
+   - Grant only "Vertex AI User" role
+   - Avoid "Owner" or "Editor" roles
+   - Use separate service accounts per environment
+
+4. **Rotate service account keys regularly**:
+   ```bash
+   # Create new key
+   gcloud iam service-accounts keys create new-key.json \
+     --iam-account=SERVICE_ACCOUNT_EMAIL
+   
+   # Delete old key
+   gcloud iam service-accounts keys delete KEY_ID \
+     --iam-account=SERVICE_ACCOUNT_EMAIL
+   ```
+
+5. **Monitor key usage**:
+   - Enable audit logging in GCP
+   - Set up alerts for unusual activity
+   - Review IAM policy bindings regularly
+
 ## Circuit Breaker Configuration
 
 ### Default Circuit Breaker

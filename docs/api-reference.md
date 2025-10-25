@@ -541,6 +541,244 @@ Get provider information.
 }
 ```
 
+### OpenAIProvider
+
+OpenAI provider implementation.
+
+```python
+from flexiai.providers import OpenAIProvider
+from flexiai.models import ProviderConfig
+
+config = ProviderConfig(
+    name="openai",
+    api_key="sk-your-api-key",
+    model="gpt-4o-mini",
+    priority=1,
+    config={
+        "timeout": 30,
+        "max_retries": 3
+    }
+)
+
+provider = OpenAIProvider(config)
+```
+
+#### Supported Models
+
+- `gpt-4o` - Most capable GPT-4 model
+- `gpt-4o-mini` - Affordable and fast GPT-4 model
+- `gpt-4-turbo` - Previous generation flagship
+- `gpt-4` - Original GPT-4 model
+- `gpt-3.5-turbo` - Fast and efficient model
+
+#### Configuration Options
+
+- `api_key` (required): OpenAI API key (starts with 'sk-')
+- `model` (required): Model identifier
+- `timeout` (optional): Request timeout in seconds (default: 30)
+- `max_retries` (optional): Maximum retry attempts (default: 3)
+- `base_url` (optional): Custom API endpoint
+
+#### Methods
+
+Inherits all methods from `BaseProvider`:
+- `chat_completion(request)` - Generate chat completion
+- `authenticate()` - Verify API key validity
+- `validate_credentials()` - Check API key format
+- `health_check()` - Test API connectivity
+
+### GeminiProvider
+
+Google Gemini Developer API provider implementation.
+
+```python
+from flexiai.providers import GeminiProvider
+from flexiai.models import ProviderConfig
+
+config = ProviderConfig(
+    name="gemini",
+    api_key="AIza-your-api-key",
+    model="gemini-2.0-flash",
+    priority=1,
+    config={
+        "timeout": 30,
+        "max_retries": 3
+    }
+)
+
+provider = GeminiProvider(config)
+```
+
+#### Supported Models
+
+- `gemini-2.5-flash` - Latest and fastest Gemini model
+- `gemini-2.0-flash` - Balanced performance and speed
+- `gemini-1.5-pro` - Advanced reasoning and complex tasks
+- `gemini-1.5-flash` - Quick responses for simple tasks
+- `gemini-pro` - General purpose model
+
+#### Configuration Options
+
+- `api_key` (required): Gemini API key (starts with 'AIza')
+- `model` (required): Model identifier
+- `timeout` (optional): Request timeout in seconds (default: 30)
+- `max_retries` (optional): Maximum retry attempts (default: 3)
+
+#### Gemini-Specific Parameters
+
+When making requests, GeminiProvider supports additional parameters:
+
+- `top_k` (int): Top-k sampling for token selection
+- `safety_settings` (dict): Content safety filter settings
+
+**Example with Gemini-specific parameters**:
+```python
+from flexiai import FlexiAI
+from flexiai.models import Message
+
+client = FlexiAI(config)
+response = client.chat_completion(
+    messages=[Message(role="user", content="Hello")],
+    temperature=0.7,
+    top_p=0.95,
+    top_k=40,  # Gemini-specific
+    max_tokens=500
+)
+```
+
+#### Safety Ratings
+
+Gemini responses include safety ratings in metadata:
+
+```python
+response = client.chat_completion(...)
+safety_ratings = response.metadata.get('safety_ratings', [])
+# Example: [{'category': 'HARM_CATEGORY_HATE_SPEECH', 'probability': 'NEGLIGIBLE'}, ...]
+```
+
+#### Methods
+
+Inherits all methods from `BaseProvider`:
+- `chat_completion(request)` - Generate chat completion
+- `authenticate()` - Verify API key validity  
+- `validate_credentials()` - Check API key format
+- `health_check()` - Test API connectivity
+
+### VertexAIProvider
+
+Google Vertex AI (GCP) provider implementation.
+
+```python
+from flexiai.providers import VertexAIProvider
+from flexiai.models import ProviderConfig
+
+config = ProviderConfig(
+    name="vertexai",
+    api_key="not-used",  # Vertex AI uses OAuth2
+    model="gemini-2.0-flash",
+    priority=1,
+    config={
+        "project": "your-gcp-project-id",
+        "location": "us-central1",
+        "service_account_file": "/path/to/service-account.json",
+        "timeout": 30,
+        "max_retries": 3
+    }
+)
+
+provider = VertexAIProvider(config)
+```
+
+#### Supported Models
+
+**Gemini Models on Vertex AI**:
+- `gemini-2.0-flash` - Latest Gemini on GCP
+- `gemini-1.5-pro` - Advanced Gemini on GCP
+- `gemini-1.5-flash` - Fast Gemini on GCP
+
+**PaLM 2 Models**:
+- `text-bison` - Text generation
+- `chat-bison` - Chat interactions
+- `codechat-bison` - Code assistance
+
+#### Configuration Options
+
+- `api_key` (not used): Set to any value, Vertex AI uses OAuth2
+- `model` (required): Model identifier
+- `project` (required): GCP project ID
+- `location` (optional): GCP region (default: 'us-central1')
+- `service_account_file` (optional): Path to service account JSON file
+- `timeout` (optional): Request timeout in seconds (default: 30)
+- `max_retries` (optional): Maximum retry attempts (default: 3)
+
+#### Authentication Methods
+
+**Option 1: Service Account (Recommended for Production)**
+
+```python
+config = ProviderConfig(
+    name="vertexai",
+    api_key="not-used",
+    model="gemini-2.0-flash",
+    config={
+        "project": "my-gcp-project",
+        "location": "us-central1",
+        "service_account_file": "/path/to/service-account.json"
+    }
+)
+```
+
+**Option 2: Application Default Credentials (ADC)**
+
+```bash
+# Authenticate via gcloud
+gcloud auth application-default login
+
+# Or set environment variable
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+```
+
+```python
+config = ProviderConfig(
+    name="vertexai",
+    api_key="not-used",
+    model="gemini-2.0-flash",
+    config={
+        "project": "my-gcp-project",
+        "location": "us-central1"
+        # Will use ADC automatically
+    }
+)
+```
+
+#### Available GCP Regions
+
+- `us-central1` (default) - Iowa, USA
+- `us-east1` - South Carolina, USA
+- `us-west1` - Oregon, USA
+- `europe-west1` - Belgium, Europe
+- `europe-west4` - Netherlands, Europe
+- `asia-northeast1` - Tokyo, Asia
+- `asia-southeast1` - Singapore, Asia
+
+#### Methods
+
+Inherits all methods from `BaseProvider`:
+- `chat_completion(request)` - Generate chat completion
+- `authenticate()` - Verify GCP credentials
+- `validate_credentials()` - Check project configuration
+- `health_check()` - Test API connectivity
+
+#### Security Best Practices
+
+⚠️ **Never commit service account files to version control!**
+
+- Add to `.gitignore`: `*.json`, `service-account*.json`
+- Store credentials securely (GCP Secret Manager, environment variables)
+- Use IAM roles with minimum required permissions
+- Rotate service account keys regularly
+- Use ADC in development, service accounts in production
+
 ## Circuit Breaker
 
 ### CircuitBreaker

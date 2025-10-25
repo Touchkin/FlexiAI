@@ -8,27 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Phase 2: Google Gemini Integration (In Progress)**
+- **Phase 2: Google Gemini & Vertex AI Integration (Complete)**
   - Added `google-genai>=0.8.0` dependency
-  - Implemented `GeminiProvider` class for Google Gemini API integration
+  - Implemented `GeminiProvider` class for Google Gemini Developer API
+  - Implemented `VertexAIProvider` class for Google Vertex AI (GCP)
   - Added `GeminiRequestNormalizer` for request format conversion
   - Added `GeminiResponseNormalizer` for response format conversion
-  - Support for gemini-2.0-flash-exp and other Gemini models
-  - Multi-provider failover between OpenAI and Gemini
+  - Support for gemini-2.0-flash, gemini-1.5-pro, and other Gemini models
+  - Support for Vertex AI models (text-bison, chat-bison, codechat-bison)
+  - Multi-provider failover: OpenAI → Gemini → Vertex AI
   - Gemini API key validation (AIza pattern)
+  - Vertex AI service account and ADC authentication
   - Safety ratings preservation in response metadata
   - 39 new tests (19 normalizer tests, 10 provider tests, 10 integration tests)
-  - Integration tests ready for real Gemini API (requires GEMINI_API_KEY)
-- **Phase 2.8: Vertex AI Provider (Complete)**
-  - Implemented `VertexAIProvider` class for Google Vertex AI integration
-  - Uses Google Cloud Application Default Credentials (ADC) instead of API keys
-  - Support for GCP project and location configuration
-  - Reuses Gemini normalizers (same API format as Gemini)
-  - Support for Vertex AI specific models (text-bison, chat-bison, codechat-bison)
-  - 19 comprehensive unit tests for Vertex AI provider
-  - 10 integration tests (requires GOOGLE_CLOUD_PROJECT env var)
-  - Multi-provider support: OpenAI + Gemini + Vertex AI
-  - Automatic failover across all three providers
+  - 18 Vertex AI unit tests, 10 integration tests
+  
+- **Phase 2.9: Comprehensive Documentation (Complete)**
+  - Complete README.md with all 3 providers (OpenAI, Gemini, Vertex AI)
+  - Installation guide, quick start, multi-provider failover examples
+  - Authentication methods for each provider documented
+  - Example files:
+    - `examples/gemini_basic.py` - 6 Gemini Developer API examples
+    - `examples/vertexai_basic.py` - 6 Vertex AI examples
+    - `examples/multi_provider_failover.py` - 5 multi-provider examples
+  - Updated `docs/api-reference.md` with GeminiProvider and VertexAIProvider
+  - Updated `docs/configuration.md` with GCP authentication guide
+  - Comprehensive troubleshooting section covering all providers
+  - Security best practices for GCP service accounts
+  - Supported models list for all providers
+  - Roadmap and contribution guidelines
 
 ### Changed
 - Updated `ModelValidator` to support Gemini models (gemini-2.5, gemini-2.0, gemini-1.5, gemini-pro)
@@ -36,13 +44,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `APIKeyValidator` to validate Gemini API keys
 - Enhanced `FlexiAI` client to support multiple providers simultaneously (OpenAI, Gemini, Vertex AI)
 - Updated provider registry to handle Gemini and Vertex AI providers
-- Updated `ProviderConfig` validator to include "vertexai" as supported provider
+- Updated `ProviderConfig` validator to include "gemini" and "vertexai" as supported providers
+- Enhanced multi-provider failover with independent circuit breakers per provider
 
 ### Fixed
 - N/A
 
 ### Security
-- N/A
+- Added comprehensive .gitignore patterns for credentials (*.json, *.key, service-account*.json)
+- Documented security best practices for service account management
+- Added warnings about never committing credentials to version control
 
 ---
 
