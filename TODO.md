@@ -1,17 +1,24 @@
 # FlexiAI Development TODO
 
-## 📍 Current Phase: Phase 2 Complete - Cleanup and Next Steps
+## 📍 Current Phase: Phase 3 - Anthropic Claude Integration (Starting)
 
 ### 🎯 Current Objectives
-- ✅ Phase 2 (Google Vertex AI Integration) - COMPLETE
-- ✅ Removed GeminiProvider (Developer API) - COMPLETE
-- ✅ All documentation updated for Vertex AI only
-- 🔄 Ready to merge and move to Phase 3
+- 🔄 Phase 3.1: Claude Provider Research and Setup (In Progress)
+- ⏳ Phase 3.2: Claude Request Normalizer
+- ⏳ Phase 3.3: Claude Response Normalizer
+- ⏳ Phase 3.4: Claude Provider Implementation
+- ⏳ Phase 3.5: Complete Multi-Provider Integration
+- ⏳ Phase 3.6: Claude-Specific Tests
+- ⏳ Phase 3.7: Documentation Update
 
-### 🔄 In Progress
-- Merging fix/phase-2.6-tests to main branch
+### ✅ Recently Completed (Phase 2)
+- **Fixed all 9 failing Vertex AI provider tests** (Phase 2.6)
+  - [x] Fixed FinishReason enum access pattern
+  - [x] Added defensive safety_ratings handling
+  - [x] Fixed test_initialization_missing_project
+  - [x] All 414 unit tests passing (100% success rate)
+  - [x] Coverage increased to 95%
 
-### ✅ Recently Completed
 - **BREAKING CHANGE: Removed GeminiProvider** (Developer API)
   - [x] Deleted flexiai/providers/gemini_provider.py
   - [x] Deleted tests/unit/test_gemini_provider.py
