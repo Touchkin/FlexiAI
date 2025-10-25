@@ -478,3 +478,47 @@ class InvalidResponseError(ProviderException):
             details: Additional context about the invalid response
         """
         super().__init__(message, provider=provider, is_retryable=False, details=details)
+
+
+class ProviderNotFoundError(FlexiAIException):
+    """
+    Raised when attempting to access a provider that is not registered.
+
+    Example:
+        >>> raise ProviderNotFoundError(
+        ...     "Provider 'gemini' is not registered",
+        ...     details={"provider": "gemini"}
+        ... )
+    """
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Initialize ProviderNotFoundError.
+
+        Args:
+            message: Description of the error
+            details: Additional context about the missing provider
+        """
+        super().__init__(f"Provider Not Found: {message}", details)
+
+
+class ProviderRegistrationError(FlexiAIException):
+    """
+    Raised when there is an error registering or unregistering a provider.
+
+    Example:
+        >>> raise ProviderRegistrationError(
+        ...     "Provider 'openai' is already registered",
+        ...     details={"provider": "openai"}
+        ... )
+    """
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Initialize ProviderRegistrationError.
+
+        Args:
+            message: Description of the error
+            details: Additional context about the registration error
+        """
+        super().__init__(f"Provider Registration Error: {message}", details)

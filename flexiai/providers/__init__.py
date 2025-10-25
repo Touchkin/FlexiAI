@@ -2,5 +2,6 @@
 
 from flexiai.providers.base import BaseProvider
 from flexiai.providers.openai_provider import OpenAIProvider
+from flexiai.providers.registry import ProviderRegistry
 
-__all__ = ["BaseProvider", "OpenAIProvider"]
+__all__ = ["BaseProvider", "OpenAIProvider", "ProviderRegistry"]
