@@ -8,7 +8,7 @@
 
 ## 🌟 Features
 
-- **Multi-Provider Support**: OpenAI, Google Gemini, and Google Vertex AI
+- **Multi-Provider Support**: OpenAI and Google Vertex AI
 - **Automatic Failover**: Priority-based provider selection with circuit breaker pattern
 - **Unified Interface**: Single API for all providers
 - **Type-Safe**: Full type hints and Pydantic validation
@@ -28,9 +28,6 @@ pip install flexiai
 ```bash
 # For OpenAI support
 pip install openai
-
-# For Google Gemini support
-pip install google-genai
 
 # For Google Vertex AI support
 pip install google-genai google-auth
@@ -74,30 +71,6 @@ response = client.chat_completion(
 print(response.content)
 print(f"Tokens used: {response.usage.total_tokens}")
 print(f"Provider: {response.metadata.provider}")
-```
-
-### Using Google Gemini (Developer API)
-
-```python
-config = FlexiAIConfig(
-    providers=[
-        ProviderConfig(
-            name="gemini",
-            api_key="AIza-your-gemini-api-key",
-            model="gemini-2.0-flash",
-            priority=1
-        )
-    ]
-)
-
-client = FlexiAI(config)
-response = client.chat_completion(
-    messages=[
-        Message(role="user", content="Explain machine learning")
-    ],
-    temperature=0.7,
-    max_tokens=1000
-)
 ```
 
 ### Using Google Vertex AI (GCP)
@@ -144,19 +117,12 @@ config = FlexiAIConfig(
             model="gpt-4o-mini",
             priority=1
         ),
-        # Fallback 1: Google Gemini
-        ProviderConfig(
-            name="gemini",
-            api_key="AIza-your-gemini-key",
-            model="gemini-2.0-flash",
-            priority=2
-        ),
-        # Fallback 2: Google Vertex AI
+        # Fallback: Google Vertex AI
         ProviderConfig(
             name="vertexai",
             api_key="not-used",
             model="gemini-2.0-flash",
-            priority=3,
+            priority=2,
             config={
                 "project": "your-gcp-project",
                 "location": "us-central1",
@@ -173,8 +139,7 @@ config = FlexiAIConfig(
 
 client = FlexiAI(config)
 
-# If OpenAI fails, automatically falls back to Gemini
-# If Gemini fails, automatically falls back to Vertex AI
+# If OpenAI fails, automatically falls back to Vertex AI
 response = client.chat_completion(
     messages=[Message(role="user", content="Tell me a joke")]
 )
@@ -280,7 +245,6 @@ client = FlexiAI(config)
 
 ```bash
 export OPENAI_API_KEY="sk-your-key"
-export GEMINI_API_KEY="AIza-your-key"
 export GOOGLE_CLOUD_PROJECT="your-project-id"
 ```
 
@@ -298,10 +262,14 @@ config = FlexiAIConfig(
             priority=1
         ),
         ProviderConfig(
-            name="gemini",
-            api_key=os.getenv("GEMINI_API_KEY"),
+            name="vertexai",
+            api_key="not-used",
             model="gemini-2.0-flash",
-            priority=2
+            priority=2,
+            config={
+                "project": os.getenv("GOOGLE_CLOUD_PROJECT"),
+                "location": "us-central1"
+            }
         )
     ]
 )
@@ -320,18 +288,6 @@ ProviderConfig(
     name="openai",
     api_key="sk-proj-...",  # Get from https://platform.openai.com/api-keys
     model="gpt-4o-mini"
-)
-```
-
-### Google Gemini (Developer API)
-
-Gemini Developer API uses API keys:
-
-```python
-ProviderConfig(
-    name="gemini",
-    api_key="AIza...",  # Get from https://aistudio.google.com/app/apikey
-    model="gemini-2.0-flash"
 )
 ```
 
@@ -387,14 +343,6 @@ ProviderConfig(
 - `gpt-4-turbo` - Previous generation flagship
 - `gpt-3.5-turbo` - Fast and efficient
 
-### Google Gemini Models
-
-- `gemini-2.5-flash` - Latest and fastest
-- `gemini-2.0-flash` - Balanced performance
-- `gemini-1.5-pro` - Advanced reasoning
-- `gemini-1.5-flash` - Quick responses
-- `gemini-pro` - General purpose
-
 ### Google Vertex AI Models
 
 - `gemini-2.0-flash` - Latest Gemini on GCP
@@ -419,7 +367,7 @@ ProviderConfig(
 ```
 Error: AuthenticationError: Incorrect API key provided
 ```
-**Solution**: 
+**Solution**:
 - Verify API key starts with `sk-proj-` or `sk-`
 - Check at https://platform.openai.com/api-keys
 - Ensure no extra spaces or newlines in the key
@@ -432,36 +380,6 @@ Error: RateLimitError: You exceeded your current quota
 - Check your OpenAI account billing at https://platform.openai.com/account/billing
 - Upgrade your plan or add payment method
 - Implement exponential backoff (built into FlexiAI)
-
-### Google Gemini Issues
-
-#### Invalid Gemini API Key
-```
-Error: 401 UNAUTHENTICATED
-```
-**Solution**:
-- Verify API key starts with `AIza`
-- Get a valid key from https://aistudio.google.com/app/apikey
-- Ensure API key is enabled for Gemini API
-
-#### Safety Filter Blocking
-```
-Error: Response blocked due to safety filters
-```
-**Solution**:
-- Content triggered safety filters (hate speech, dangerous content, etc.)
-- Rephrase your prompt to avoid sensitive topics
-- Check `response.metadata.get('safety_ratings')` for details
-- Gemini has stricter safety settings than other providers
-
-#### Model Not Found
-```
-Error: Model gemini-xxx not found
-```
-**Solution**:
-- Use supported models: `gemini-2.0-flash`, `gemini-1.5-pro`, `gemini-1.5-flash`
-- Check model availability in your region
-- Some models require API allowlisting
 
 ### Google Vertex AI Issues
 
@@ -530,12 +448,15 @@ Error: Project not found or Location not supported
 
 #### API Keys Not Supported
 ```
+
+#### API Keys Not Supported
+```
 Error: API keys are not supported by this API
 ```
 **Solution**:
 - Vertex AI requires OAuth2, not API keys
 - Use service account file or ADC
-- Don't try to use Gemini API keys with Vertex AI
+- Vertex AI uses different authentication than Gemini Developer API
 
 ### Multi-Provider Failover Issues
 
@@ -573,10 +494,10 @@ api_key = os.getenv("OPENAI_API_KEY")
 
 #### Mixing Provider Types
 ```python
-# ❌ Wrong - Using Gemini key with Vertex AI
+# ❌ Wrong - Vertex AI doesn't use Gemini API keys
 ProviderConfig(
     name="vertexai",
-    api_key="AIza...",  # Gemini API key won't work!
+    api_key="AIza...",  # Won't work!
     ...
 )
 
@@ -643,7 +564,6 @@ pytest tests/unit/test_client.py
 
 # Run integration tests (requires API keys)
 export OPENAI_API_KEY="sk-..."
-export GEMINI_API_KEY="AIza..."
 export GOOGLE_CLOUD_PROJECT="your-project"
 pytest tests/integration/
 ```
@@ -690,7 +610,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🗺️ Roadmap
 
 - [x] Phase 1: OpenAI Support
-- [x] Phase 2: Google Gemini & Vertex AI Support
+- [x] Phase 2: Google Vertex AI Support
 - [ ] Phase 3: Anthropic Claude Support
 - [ ] Phase 4: Streaming Support
 - [ ] Phase 5: Azure OpenAI Support
