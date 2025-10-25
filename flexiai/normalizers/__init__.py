@@ -7,6 +7,7 @@ from flexiai.normalizers.request import (
     RequestNormalizer,
 )
 from flexiai.normalizers.response import (
+    ClaudeResponseNormalizer,
     GeminiResponseNormalizer,
     OpenAIResponseNormalizer,
     ResponseNormalizer,
@@ -20,4 +21,5 @@ __all__ = [
     "GeminiRequestNormalizer",
     "GeminiResponseNormalizer",
     "ClaudeRequestNormalizer",
+    "ClaudeResponseNormalizer",
 ]
