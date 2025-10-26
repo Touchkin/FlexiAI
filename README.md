@@ -73,7 +73,7 @@ response = client.chat_completion(
 
 print(response.content)
 print(f"Tokens used: {response.usage.total_tokens}")
-print(f"Provider: {response.metadata.provider}")
+print(f"Provider: {response.provider}")
 ```
 
 ### Using Google Vertex AI (GCP)
@@ -188,7 +188,7 @@ response = client.chat_completion(
 )
 
 # Check which provider was used
-print(f"Response from: {response.metadata.provider}")
+print(f"Response from: {response.provider}")
 ```
 
 ## 🎯 Advanced Features
