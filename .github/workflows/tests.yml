@@ -12,7 +12,7 @@ permissions:
 jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
-    runs-on: [self-hosted, Linux, X64, python36]
+    runs-on: ubuntu-latest  # TODO: Change to [self-hosted, Linux, X64, python36] when runner is available
     strategy:
       fail-fast: false
       matrix:
@@ -62,7 +62,7 @@ jobs:
 
   build-check:
     name: Build package check
-    runs-on: [self-hosted, Linux, X64, python36]
+    runs-on: ubuntu-latest  # TODO: Change to [self-hosted, Linux, X64, python36] when runner is available
 
     steps:
       - name: Checkout code
