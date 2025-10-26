@@ -11,6 +11,7 @@
 
 - **Multi-Provider Support**: OpenAI, Google Vertex AI, and Anthropic Claude
 - **Automatic Failover**: Priority-based provider selection with circuit breaker pattern
+- **Multi-Worker Synchronization**: Redis-based circuit breaker state sync across workers
 - **Unified Interface**: Single API for all providers
 - **Type-Safe**: Full type hints and Pydantic validation
 - **Production-Ready**: 95% test coverage, comprehensive error handling
@@ -247,6 +248,35 @@ for provider_info in status['providers']:
     print(f"  Circuit Breaker: {provider_info['circuit_breaker']['state']}")
     print(f"  Success Rate: {provider_info['successful_requests']}/{provider_info['total_requests']}")
 ```
+
+### Multi-Worker Deployments
+
+FlexiAI supports circuit breaker state synchronization across multiple workers using Redis. When one worker opens a circuit breaker, all other workers are immediately notified.
+
+```python
+from flexiai.models import SyncConfig
+
+config = FlexiAIConfig(
+    providers=[...],
+    sync=SyncConfig(
+        enabled=True,
+        backend="redis",
+        redis_host="localhost",
+        redis_port=6379,
+        state_ttl=3600  # State expires after 1 hour
+    )
+)
+
+# Use with Gunicorn/Uvicorn
+# gunicorn app:app --workers 4 --worker-class uvicorn.workers.UvicornWorker
+```
+
+**Key Benefits:**
+- **Consistent Behavior**: All workers react to failures simultaneously
+- **Faster Recovery**: Distributed state prevents redundant failure attempts
+- **Production-Ready**: Tested with Gunicorn, Uvicorn, and Kubernetes deployments
+
+See [Multi-Worker Deployment Guide](docs/multi-worker-deployment.md) for detailed setup instructions.
 
 ### Request Statistics
 
