@@ -57,3 +57,47 @@ repos:
       - id: bandit
         args: ['-c', 'pyproject.toml']
         additional_dependencies: ['bandit[toml]']
+
+  # Secret detection with detect-secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: '(package.lock.json|SECURITY.md|\.env\.example|.*\.md)'
+
+  # Additional security checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: detect-private-key
+        name: Detect Private Keys
+        exclude: 'SECURITY.md'
+      - id: check-case-conflict
+        name: Check for case conflicts
+      - id: forbid-new-submodules
+        name: Forbid new submodules
+
+  # Custom hook to detect API keys in code
+  - repo: local
+    hooks:
+      - id: detect-api-keys
+        name: Detect API Keys (OpenAI, Anthropic, Google)
+        entry: .githooks/detect-api-keys.sh
+        language: script
+        pass_filenames: false
+        always_run: true
+
+      - id: block-service-account-files
+        name: Block Google Service Account JSON Files
+        entry: .githooks/block-service-accounts.sh
+        language: script
+        pass_filenames: false
+        always_run: true
+
+      - id: check-env-files
+        name: Prevent .env files from being committed
+        entry: .githooks/check-env-files.sh
+        language: script
+        pass_filenames: false
+        always_run: true

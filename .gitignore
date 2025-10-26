@@ -16,6 +16,7 @@ __pycache__/
 *.pfx
 .env
 .env.*
+!.env.example
 credentials/
 secrets/
 *-credentials.json

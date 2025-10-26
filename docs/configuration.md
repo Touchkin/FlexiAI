@@ -328,7 +328,7 @@ config = FlexiAIConfig(
    # Create new key
    gcloud iam service-accounts keys create new-key.json \
      --iam-account=SERVICE_ACCOUNT_EMAIL
-   
+
    # Delete old key
    gcloud iam service-accounts keys delete KEY_ID \
      --iam-account=SERVICE_ACCOUNT_EMAIL
