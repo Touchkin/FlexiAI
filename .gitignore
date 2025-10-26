@@ -159,3 +159,4 @@ config.json
 .env.test
 dev-gemini-427512-71ac4bd1f35d.json
 *.json
+test.py
