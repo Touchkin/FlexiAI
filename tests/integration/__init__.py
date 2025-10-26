@@ -1,3 +1,1 @@
-"""
-Integration tests for FlexiAI.
-"""
+"""Integration tests for FlexiAI."""

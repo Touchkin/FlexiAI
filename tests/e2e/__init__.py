@@ -1,3 +1,1 @@
-"""
-End-to-end tests for FlexiAI.
-"""
+"""End-to-end tests for FlexiAI."""

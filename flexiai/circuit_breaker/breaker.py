@@ -242,9 +242,9 @@ class CircuitBreaker:
                 self.logger.error(
                     f"Error in state change callback: {str(e)}",
                     extra={
-                        "callback": callback.__name__
-                        if hasattr(callback, "__name__")
-                        else str(callback)
+                        "callback": (
+                            callback.__name__ if hasattr(callback, "__name__") else str(callback)
+                        )
                     },
                 )
 

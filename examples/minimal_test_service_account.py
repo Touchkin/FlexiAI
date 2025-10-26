@@ -3,7 +3,6 @@
 
 import json
 import os
-import sys
 
 # Set service account file
 SERVICE_ACCOUNT_FILE = "dev-gemini-427512-71ac4bd1f35d.json"
@@ -13,12 +12,12 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(SERVICE_ACCOUNT_F
 with open(SERVICE_ACCOUNT_FILE) as f:
     project_id = json.load(f)["project_id"]
 
+# Test FlexiAI
+from flexiai import FlexiAI  # noqa: E402
+from flexiai.models import FlexiAIConfig, Message, ProviderConfig  # noqa: E402
+
 print(f"Project: {project_id}")
 print(f"Service Account File: {SERVICE_ACCOUNT_FILE}\n")
-
-# Test FlexiAI
-from flexiai import FlexiAI
-from flexiai.models import FlexiAIConfig, Message, ProviderConfig
 
 config = FlexiAIConfig(
     providers=[

@@ -58,6 +58,33 @@ class FlexiAI:
         ... )
     """
 
+    @classmethod
+    def set_global_config(cls, config: Any) -> None:
+        """
+        Set global FlexiAI configuration for decorators.
+
+        This class method allows setting a global configuration that
+        will be used by the @flexiai_chat decorator when no explicit
+        client is provided.
+
+        Args:
+            config: FlexiAI configuration dict or FlexiAIConfig object
+
+        Example:
+            >>> FlexiAI.set_global_config({
+            ...     "providers": [
+            ...         {"name": "openai", "api_key": "sk-...", "priority": 1}
+            ...     ]
+            ... })
+            >>> from flexiai.decorators import flexiai_chat
+            >>> @flexiai_chat
+            ... def ask(question: str) -> str:
+            ...     pass
+        """
+        from flexiai.decorators import set_global_config
+
+        set_global_config(config)
+
     def __init__(self, config: Optional[FlexiAIConfig] = None) -> None:
         """
         Initialize FlexiAI client.

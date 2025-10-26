@@ -88,7 +88,7 @@ def example_2_with_adc():
                 priority=1,
                 config={
                     "project": project_id,
-                    "location": "us-central1"
+                    "location": "us-central1",
                     # Will use ADC automatically
                 },
             )
