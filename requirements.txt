@@ -5,3 +5,7 @@ anthropic>=0.7.0
 pydantic>=2.0.0
 tenacity>=8.0.0
 python-dotenv>=1.0.0
+
+# Multi-worker synchronization (optional, for production deployments)
+redis>=4.5.0
+hiredis>=2.0.0

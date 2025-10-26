@@ -14,7 +14,7 @@ long_description = (
 
 setup(
     name="flexiai",
-    version="0.3.0",
+    version="0.5.0",
     author="FlexiAI Contributors",
     author_email="",
     description="A unified interface for multiple GenAI providers with automatic failover",

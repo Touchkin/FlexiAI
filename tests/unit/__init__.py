@@ -1,3 +1,1 @@
-"""
-Unit tests for FlexiAI.
-"""
+"""Unit tests for FlexiAI."""

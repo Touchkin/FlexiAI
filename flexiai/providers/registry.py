@@ -6,13 +6,16 @@ with priority-based selection and circuit breaker integration.
 """
 
 import threading
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from flexiai.circuit_breaker import CircuitBreaker
 from flexiai.exceptions import ProviderNotFoundError, ProviderRegistrationError
 from flexiai.models import CircuitBreakerConfig
 from flexiai.providers.base import BaseProvider
 from flexiai.utils.logger import FlexiAILogger
+
+if TYPE_CHECKING:
+    from flexiai.sync.manager import StateSyncManager
 
 
 class ProviderRegistry:
@@ -70,6 +73,7 @@ class ProviderRegistry:
         self,
         provider: BaseProvider,
         circuit_breaker_config: Optional[CircuitBreakerConfig] = None,
+        sync_manager: Optional["StateSyncManager"] = None,
     ) -> None:
         """
         Register a provider with the registry.
@@ -77,6 +81,7 @@ class ProviderRegistry:
         Args:
             provider: Provider instance to register
             circuit_breaker_config: Optional circuit breaker configuration
+            sync_manager: Optional sync manager for multi-worker synchronization
 
         Raises:
             ProviderRegistrationError: If provider is invalid or already registered
@@ -93,7 +98,9 @@ class ProviderRegistry:
             if circuit_breaker_config is None:
                 circuit_breaker_config = CircuitBreakerConfig()
 
-            circuit_breaker = CircuitBreaker(name=provider.name, config=circuit_breaker_config)
+            circuit_breaker = CircuitBreaker(
+                name=provider.name, config=circuit_breaker_config, sync_manager=sync_manager
+            )
 
             self._providers[provider.name] = provider
             self._circuit_breakers[provider.name] = circuit_breaker

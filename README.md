@@ -11,6 +11,7 @@
 
 - **Multi-Provider Support**: OpenAI, Google Vertex AI, and Anthropic Claude
 - **Automatic Failover**: Priority-based provider selection with circuit breaker pattern
+- **Multi-Worker Synchronization**: Redis-based circuit breaker state sync across workers
 - **Unified Interface**: Single API for all providers
 - **Type-Safe**: Full type hints and Pydantic validation
 - **Production-Ready**: 95% test coverage, comprehensive error handling
@@ -247,6 +248,494 @@ for provider_info in status['providers']:
     print(f"  Circuit Breaker: {provider_info['circuit_breaker']['state']}")
     print(f"  Success Rate: {provider_info['successful_requests']}/{provider_info['total_requests']}")
 ```
+
+### Multi-Worker Deployments
+
+FlexiAI supports circuit breaker state synchronization across multiple workers using Redis. When one worker opens a circuit breaker, all other workers are immediately notified.
+
+```python
+from flexiai.models import SyncConfig
+
+config = FlexiAIConfig(
+    providers=[...],
+    sync=SyncConfig(
+        enabled=True,
+        backend="redis",
+        redis_host="localhost",
+        redis_port=6379,
+        state_ttl=3600  # State expires after 1 hour
+    )
+)
+
+# Use with Gunicorn/Uvicorn
+# gunicorn app:app --workers 4 --worker-class uvicorn.workers.UvicornWorker
+```
+
+**Key Benefits:**
+- **Consistent Behavior**: All workers react to failures simultaneously
+- **Faster Recovery**: Distributed state prevents redundant failure attempts
+- **Production-Ready**: Tested with Gunicorn, Uvicorn, and Kubernetes deployments
+
+See [Multi-Worker Deployment Guide](docs/multi-worker-deployment.md) for detailed setup instructions.
+
+## 🌐 Using FlexiAI with FastAPI
+
+FlexiAI integrates seamlessly with FastAPI applications, supporting both single-worker and multi-worker deployments with Redis-based synchronization.
+
+### Method 1: Normal FastAPI Integration
+
+Create a production-ready FastAPI application with FlexiAI:
+
+```python
+"""
+FastAPI application with FlexiAI multi-provider support.
+Supports multi-worker deployment with Redis synchronization.
+"""
+
+import os
+from contextlib import asynccontextmanager
+from typing import List
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+from flexiai import FlexiAI
+from flexiai.models import FlexiAIConfig, ProviderConfig, SyncConfig
+
+
+# Request/Response models
+class ChatRequest(BaseModel):
+    message: str
+    max_tokens: int = 500
+
+
+class ChatResponse(BaseModel):
+    response: str
+    provider: str
+    tokens_used: int
+    worker_id: int
+
+
+# Global FlexiAI client
+flexiai_client = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize FlexiAI on startup, cleanup on shutdown."""
+    global flexiai_client
+
+    # Configure FlexiAI with multiple providers and Redis sync
+    config = FlexiAIConfig(
+        providers=[
+            ProviderConfig(
+                name="openai",
+                api_key=os.getenv("OPENAI_API_KEY"),
+                model="gpt-4o-mini",
+                priority=1,
+            ),
+            ProviderConfig(
+                name="anthropic",
+                api_key=os.getenv("ANTHROPIC_API_KEY"),
+                model="claude-3-5-haiku-20241022",
+                priority=2,
+            ),
+            ProviderConfig(
+                name="vertexai",
+                api_key="not-used",
+                model="gemini-2.0-flash-exp",
+                priority=3,
+                config={
+                    "project": os.getenv("GOOGLE_CLOUD_PROJECT"),
+                    "location": "us-central1",
+                },
+            ),
+        ],
+        # Enable Redis sync for multi-worker deployments
+        sync=SyncConfig(
+            enabled=True,
+            backend="redis",
+            redis_host=os.getenv("REDIS_HOST", "localhost"),
+            redis_port=int(os.getenv("REDIS_PORT", "6379")),
+            redis_db=int(os.getenv("REDIS_DB", "0")),
+        ),
+        timeout=30.0,
+    )
+
+    flexiai_client = FlexiAI(config)
+    print(f"✅ FlexiAI initialized with {len(config.providers)} providers")
+
+    yield
+
+    # Cleanup
+    if flexiai_client:
+        flexiai_client.close()
+        print("🛑 FlexiAI client closed")
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="FlexiAI Chat API",
+    description="Multi-provider AI chat with automatic failover",
+    lifespan=lifespan,
+)
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    """
+    Send a chat message and get AI response.
+
+    Automatically handles provider failover and circuit breakers.
+    """
+    try:
+        response = flexiai_client.chat_completion(
+            messages=[{"role": "user", "content": request.message}],
+            max_tokens=request.max_tokens,
+        )
+
+        return ChatResponse(
+            response=response.content,
+            provider=response.provider,
+            tokens_used=response.usage.total_tokens,
+            worker_id=os.getpid(),
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI request failed: {str(e)}")
+
+
+@app.get("/health")
+async def health_check():
+    """Check API health and provider status."""
+    provider_status = flexiai_client.get_provider_status()
+    stats = flexiai_client.get_request_stats()
+
+    healthy_providers = [
+        p["name"] for p in provider_status["providers"] if p["healthy"]
+    ]
+
+    return {
+        "status": "healthy" if healthy_providers else "degraded",
+        "worker_id": os.getpid(),
+        "providers": {
+            "total": len(provider_status["providers"]),
+            "healthy": len(healthy_providers),
+            "names": healthy_providers,
+        },
+        "stats": stats,
+    }
+
+
+@app.get("/providers")
+async def get_providers():
+    """Get detailed provider status including circuit breakers."""
+    return flexiai_client.get_provider_status()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    # Single worker for development
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+
+    # Multi-worker for production (requires Redis)
+    # uvicorn.run("app:app", host="0.0.0.0", port=8000, workers=4)
+```
+
+**Run the application:**
+
+```bash
+# Development (single worker, auto-reload)
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+
+# Production (4 workers with Redis sync)
+uvicorn app:app --host 0.0.0.0 --port 8000 --workers 4
+
+# With Gunicorn (recommended for production)
+gunicorn app:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+```
+
+**Test the endpoints:**
+
+```bash
+# Send a chat message
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What is Python?", "max_tokens": 500}'
+
+# Check health
+curl http://localhost:8000/health
+
+# Get provider status
+curl http://localhost:8000/providers
+```
+
+### Method 2: Using Decorators (Recommended)
+
+FlexiAI provides decorators for cleaner integration with FastAPI:
+
+```python
+"""
+FastAPI application using FlexiAI decorators.
+Cleaner code with built-in error handling and monitoring.
+"""
+
+import os
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+from flexiai import FlexiAI
+from flexiai.decorators import flexiai_chat_completion, flexiai_configure
+from flexiai.models import FlexiAIConfig, ProviderConfig, SyncConfig
+
+
+# Request/Response models
+class ChatRequest(BaseModel):
+    message: str
+    system_prompt: str = "You are a helpful assistant."
+    max_tokens: int = 500
+
+
+class ChatResponse(BaseModel):
+    response: str
+    provider: str
+    tokens_used: int
+    worker_id: int
+
+
+# Global FlexiAI client
+flexiai_client = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize FlexiAI on startup."""
+    global flexiai_client
+
+    config = FlexiAIConfig(
+        providers=[
+            ProviderConfig(
+                name="openai",
+                api_key=os.getenv("OPENAI_API_KEY"),
+                model="gpt-4o-mini",
+                priority=1,
+            ),
+            ProviderConfig(
+                name="anthropic",
+                api_key=os.getenv("ANTHROPIC_API_KEY"),
+                model="claude-3-5-haiku-20241022",
+                priority=2,
+            ),
+        ],
+        sync=SyncConfig(
+            enabled=True,
+            backend="redis",
+            redis_host=os.getenv("REDIS_HOST", "localhost"),
+            redis_port=int(os.getenv("REDIS_PORT", "6379")),
+        ),
+    )
+
+    flexiai_client = FlexiAI(config)
+    # Configure decorators to use this client
+    flexiai_configure(flexiai_client)
+
+    yield
+
+    if flexiai_client:
+        flexiai_client.close()
+
+
+app = FastAPI(
+    title="FlexiAI Chat API (Decorators)",
+    description="Clean decorator-based FastAPI integration",
+    lifespan=lifespan,
+)
+
+
+# Method 1: Using decorator on regular function
+@flexiai_chat_completion(
+    max_tokens=500,
+    temperature=0.7,
+    handle_errors=True,  # Automatic error handling
+)
+def generate_response(user_message: str, system_prompt: str):
+    """
+    Generate AI response using FlexiAI decorator.
+
+    The decorator automatically:
+    - Formats messages
+    - Handles provider failover
+    - Manages circuit breakers
+    - Returns FlexiAI response object
+    """
+    return {
+        "system": system_prompt,
+        "user": user_message,
+    }
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    """
+    Chat endpoint using FlexiAI decorator.
+
+    Benefits:
+    - Cleaner code (no manual FlexiAI calls)
+    - Automatic error handling
+    - Built-in monitoring
+    - Circuit breaker integration
+    """
+    try:
+        # Call decorated function
+        response = generate_response(
+            user_message=request.message,
+            system_prompt=request.system_prompt,
+        )
+
+        return ChatResponse(
+            response=response.content,
+            provider=response.provider,
+            tokens_used=response.usage.total_tokens,
+            worker_id=os.getpid(),
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Method 2: Using decorator with custom message formatting
+@flexiai_chat_completion(max_tokens=200, temperature=0.5)
+def summarize_text(text: str):
+    """Summarize text using AI."""
+    return {
+        "system": "You are a text summarization expert. Provide concise summaries.",
+        "user": f"Summarize this text:\n\n{text}",
+    }
+
+
+@app.post("/summarize")
+async def summarize(text: str):
+    """Summarize text endpoint."""
+    try:
+        response = summarize_text(text=text)
+        return {
+            "summary": response.content,
+            "provider": response.provider,
+            "tokens": response.usage.total_tokens,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Method 3: Using decorator with list of messages
+@flexiai_chat_completion(max_tokens=1000)
+def chat_with_history(messages: list):
+    """Chat with conversation history."""
+    return messages  # Decorator handles the message formatting
+
+
+@app.post("/chat-history")
+async def chat_history(messages: list):
+    """
+    Chat with conversation history.
+
+    Example:
+    [
+        {"role": "user", "content": "What is Python?"},
+        {"role": "assistant", "content": "Python is..."},
+        {"role": "user", "content": "Tell me more"}
+    ]
+    """
+    try:
+        response = chat_with_history(messages=messages)
+        return {
+            "response": response.content,
+            "provider": response.provider,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/health")
+async def health():
+    """Health check with provider status."""
+    return flexiai_client.get_provider_status()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, workers=4)
+```
+
+**Run with decorators:**
+
+```bash
+# Development
+uvicorn app:app --reload
+
+# Production (4 workers)
+uvicorn app:app --workers 4
+
+# Test the endpoints
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Explain FastAPI in 2 sentences",
+    "system_prompt": "You are a Python expert",
+    "max_tokens": 200
+  }'
+
+curl -X POST http://localhost:8000/summarize?text="Long%20text%20here"
+
+curl -X POST http://localhost:8000/chat-history \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"role": "user", "content": "Hi!"},
+    {"role": "assistant", "content": "Hello! How can I help?"},
+    {"role": "user", "content": "What is FastAPI?"}
+  ]'
+```
+
+### Decorator Benefits
+
+✅ **Cleaner Code**: Less boilerplate, more readable
+✅ **Automatic Error Handling**: Built-in exception management
+✅ **Monitoring**: Automatic request/response logging
+✅ **Type Safety**: Full type hints and validation
+✅ **Reusable**: Decorate any function, not just FastAPI routes
+✅ **Circuit Breakers**: Automatic failover and recovery
+
+### Multi-Worker Production Setup
+
+For production deployments with multiple workers, ensure Redis is running:
+
+```bash
+# Start Redis (required for multi-worker sync)
+redis-server
+
+# Set environment variables
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+export REDIS_HOST="localhost"
+export REDIS_PORT="6379"
+
+# Run with 4 workers (circuit breaker state synced via Redis)
+uvicorn app:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+**What happens with multi-worker sync:**
+1. Worker 1 detects OpenAI is down (3+ failures)
+2. Worker 1 opens circuit breaker and publishes event to Redis
+3. Workers 2, 3, 4 receive the event within milliseconds
+4. All workers open their OpenAI circuit breakers
+5. All workers automatically failover to next provider (Anthropic)
+6. **Result:** Consistent behavior across all workers!
+
+See `tests/integration/test_multiworker_fastapi.py` for a complete working example.
 
 ### Request Statistics
 

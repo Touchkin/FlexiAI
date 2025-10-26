@@ -6,12 +6,16 @@ the circuit breaker pattern to prevent cascading failures.
 """
 
 import threading
-from typing import Callable, TypeVar
+from typing import TYPE_CHECKING, Callable, Optional, TypeVar
 
 from flexiai.circuit_breaker.state import CircuitBreakerState, CircuitState
 from flexiai.exceptions import CircuitBreakerOpenError
 from flexiai.models import CircuitBreakerConfig
 from flexiai.utils.logger import FlexiAILogger
+
+if TYPE_CHECKING:
+    from flexiai.sync.events import CircuitBreakerEvent
+    from flexiai.sync.manager import StateSyncManager
 
 T = TypeVar("T")
 
@@ -35,15 +39,22 @@ class CircuitBreaker:
         logger: Logger instance
         _lock: Thread lock for thread-safe operations
         _state_change_callbacks: Callbacks for state change events
+        _sync_manager: Optional sync manager for multi-worker coordination
     """
 
-    def __init__(self, name: str, config: CircuitBreakerConfig) -> None:
+    def __init__(
+        self,
+        name: str,
+        config: CircuitBreakerConfig,
+        sync_manager: Optional["StateSyncManager"] = None,
+    ) -> None:
         """
         Initialize circuit breaker.
 
         Args:
             name: Circuit breaker name (e.g., provider name)
             config: Circuit breaker configuration
+            sync_manager: Optional sync manager for multi-worker state sharing
         """
         self.name = name
         self.config = config
@@ -51,12 +62,18 @@ class CircuitBreaker:
         self.logger = FlexiAILogger.get_logger(f"flexiai.circuit_breaker.{name}")
         self._lock = threading.Lock()
         self._state_change_callbacks: list[Callable[[CircuitState, CircuitState], None]] = []
+        self._sync_manager = sync_manager
+
+        # Register with sync manager if provided
+        if self._sync_manager is not None:
+            self._sync_manager.register_circuit_breaker(name, self)
 
         self.logger.info(
             f"Circuit breaker initialized for {name}",
             extra={
                 "failure_threshold": config.failure_threshold,
                 "recovery_timeout": config.recovery_timeout,
+                "sync_enabled": sync_manager is not None,
             },
         )
 
@@ -234,6 +251,9 @@ class CircuitBreaker:
             extra={"old_state": old_state.value, "new_state": new_state.value},
         )
 
+        # Broadcast state change to other workers if sync manager is available
+        self._broadcast_state_change(new_state)
+
         # Notify callbacks
         for callback in self._state_change_callbacks:
             try:
@@ -242,11 +262,50 @@ class CircuitBreaker:
                 self.logger.error(
                     f"Error in state change callback: {str(e)}",
                     extra={
-                        "callback": callback.__name__
-                        if hasattr(callback, "__name__")
-                        else str(callback)
+                        "callback": (
+                            callback.__name__ if hasattr(callback, "__name__") else str(callback)
+                        )
                     },
                 )
+
+    def _broadcast_state_change(self, new_state: CircuitState) -> None:
+        """
+        Broadcast state change to other workers via sync manager.
+
+        Args:
+            new_state: The new state to broadcast
+        """
+        if self._sync_manager is None:
+            return
+
+        # Import here to avoid circular dependency
+        from flexiai.sync.events import CircuitBreakerEventType
+
+        # Map CircuitState to CircuitBreakerEventType
+        event_type_map = {
+            CircuitState.OPEN: CircuitBreakerEventType.OPENED,
+            CircuitState.CLOSED: CircuitBreakerEventType.CLOSED,
+            CircuitState.HALF_OPEN: CircuitBreakerEventType.HALF_OPEN,
+        }
+
+        event_type = event_type_map.get(new_state)
+        if event_type is None:
+            return
+
+        # Get current state info for metadata
+        metadata = {
+            "failure_count": self.state.failure_count,
+            "success_count": self.state.success_count,
+        }
+
+        # Broadcast via sync manager
+        try:
+            self._sync_manager.on_local_state_change(
+                provider_name=self.name, event_type=event_type, metadata=metadata
+            )
+        except Exception as e:  # nosec B110
+            # Log but don't fail on broadcast errors
+            self.logger.error(f"Failed to broadcast state change: {str(e)}")
 
     def reset(self) -> None:
         """
@@ -343,6 +402,109 @@ class CircuitBreaker:
         with self._lock:
             if callback in self._state_change_callbacks:
                 self._state_change_callbacks.remove(callback)
+
+    def apply_remote_state(self, event: "CircuitBreakerEvent") -> None:
+        """
+        Apply a state change event from another worker.
+
+        Args:
+            event: Circuit breaker event from remote worker
+        """
+        from flexiai.sync.events import CircuitBreakerEventType
+
+        # Map event type to circuit state
+        event_to_state_map = {
+            CircuitBreakerEventType.OPENED: CircuitState.OPEN,
+            CircuitBreakerEventType.CLOSED: CircuitState.CLOSED,
+            CircuitBreakerEventType.HALF_OPEN: CircuitState.HALF_OPEN,
+        }
+
+        new_state = event_to_state_map.get(event.event_type)
+        if new_state is None:
+            # Not a state transition event (e.g., FAILURE or SUCCESS)
+            return
+
+        with self._lock:
+            old_state = self.state.state
+            if old_state == new_state:
+                return  # Already in this state
+
+            # Apply the remote state change
+            self.state.transition_to(new_state)
+
+            # Update metadata if available
+            if "failure_count" in event.metadata:
+                self.state.failure_count = event.metadata["failure_count"]
+            if "success_count" in event.metadata:
+                self.state.success_count = event.metadata["success_count"]
+
+            self.logger.info(
+                (
+                    f"Applied remote state change for {self.name}: "
+                    f"{old_state.value} -> {new_state.value}"
+                ),
+                extra={
+                    "old_state": old_state.value,
+                    "new_state": new_state.value,
+                    "remote_worker": event.worker_id,
+                },
+            )
+
+    def get_state_dict(self) -> dict:
+        """
+        Get state as a dictionary for serialization.
+
+        Returns:
+            Dictionary containing serializable state
+        """
+        with self._lock:
+            return {
+                "state": self.state.state.value,
+                "failure_count": self.state.failure_count,
+                "success_count": self.state.success_count,
+                "last_failure_time": (
+                    self.state.last_failure_time.isoformat()
+                    if self.state.last_failure_time
+                    else None
+                ),
+                "state_changed_at": (
+                    self.state.state_changed_at.isoformat() if self.state.state_changed_at else None
+                ),
+            }
+
+    def load_state(self, state_dict: dict) -> None:
+        """
+        Load state from a dictionary (used for sync on startup).
+
+        Args:
+            state_dict: Dictionary containing state to load
+        """
+        from datetime import datetime
+
+        with self._lock:
+            # Only load if the remote state is more recent
+            if "state_changed_at" in state_dict and state_dict["state_changed_at"]:
+                try:
+                    remote_time = datetime.fromisoformat(state_dict["state_changed_at"])
+                    if self.state.state_changed_at and remote_time <= self.state.state_changed_at:
+                        return  # Local state is newer or same
+                except (ValueError, TypeError):
+                    pass  # Continue with load if timestamp parsing fails
+
+            # Load state
+            if "state" in state_dict:
+                try:
+                    new_state = CircuitState(state_dict["state"])
+                    self.state.transition_to(new_state)
+                except (ValueError, KeyError):
+                    pass  # Invalid state, skip
+
+            if "failure_count" in state_dict:
+                self.state.failure_count = state_dict["failure_count"]
+            if "success_count" in state_dict:
+                self.state.success_count = state_dict["success_count"]
+
+            self.logger.info(f"Loaded state from sync storage for {self.name}")
 
     def __repr__(self) -> str:
         """

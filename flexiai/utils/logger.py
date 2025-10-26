@@ -293,9 +293,9 @@ class FlexiAILogger:
         """
         if isinstance(data, dict):
             return {
-                key: "***MASKED***"
-                if cls._is_sensitive_key(key)
-                else cls.mask_sensitive_data(value)
+                key: (
+                    "***MASKED***" if cls._is_sensitive_key(key) else cls.mask_sensitive_data(value)
+                )
                 for key, value in data.items()
             }
         elif isinstance(data, list):

@@ -344,6 +344,62 @@ class LoggingConfig(BaseModel):
         return v.upper()
 
 
+class SyncConfig(BaseModel):
+    """
+    Configuration for multi-worker state synchronization.
+
+    This configuration controls how FlexiAI synchronizes circuit breaker
+    state across multiple workers using Redis or in-memory backends.
+
+    Attributes:
+        enabled: Enable state synchronization
+        backend: Backend type ('redis' or 'memory')
+        redis_host: Redis server hostname
+        redis_port: Redis server port
+        redis_db: Redis database number
+        redis_password: Redis password (optional)
+        redis_ssl: Use SSL for Redis connection
+        redis_socket_timeout: Socket timeout in seconds
+        redis_socket_connect_timeout: Connection timeout in seconds
+        worker_id: Custom worker identifier (auto-generated if None)
+        key_prefix: Prefix for all Redis keys
+        channel: Redis pub/sub channel name
+        state_ttl: State expiration time in seconds
+
+    Example:
+        >>> sync_config = SyncConfig(
+        ...     enabled=True,
+        ...     backend="redis",
+        ...     redis_host="localhost"
+        ... )
+        >>> print(sync_config.redis_port)
+        6379
+    """
+
+    enabled: bool = Field(False, description="Enable synchronization")
+    backend: str = Field("redis", description="Backend type (redis or memory)")
+    redis_host: str = Field("localhost", description="Redis host")
+    redis_port: int = Field(6379, ge=1, le=65535, description="Redis port")
+    redis_db: int = Field(0, ge=0, description="Redis database")
+    redis_password: Optional[str] = Field(None, description="Redis password")
+    redis_ssl: bool = Field(False, description="Use SSL for Redis")
+    redis_socket_timeout: float = Field(5.0, ge=0.1, description="Socket timeout")
+    redis_socket_connect_timeout: float = Field(5.0, ge=0.1, description="Connect timeout")
+    worker_id: Optional[str] = Field(None, description="Worker ID (auto-generated if None)")
+    key_prefix: str = Field("flexiai", description="Redis key prefix")
+    channel: str = Field("flexiai:events", description="Pub/sub channel")
+    state_ttl: int = Field(3600, ge=60, description="State TTL in seconds")
+
+    @field_validator("backend")
+    @classmethod
+    def validate_backend(cls, v: str) -> str:
+        """Validate backend type."""
+        valid_backends = ["redis", "memory"]
+        if v.lower() not in valid_backends:
+            raise ValueError(f"Invalid backend. Must be one of: {valid_backends}")
+        return v.lower()
+
+
 class FlexiAIConfig(BaseModel):
     """
     Main configuration for FlexiAI client.
@@ -385,6 +441,7 @@ class FlexiAIConfig(BaseModel):
     logging: LoggingConfig = Field(
         default_factory=lambda: LoggingConfig(), description="Logging config"
     )
+    sync: SyncConfig = Field(default_factory=lambda: SyncConfig(), description="Sync config")
     default_temperature: float = Field(0.7, ge=0.0, le=2.0, description="Default temperature")
     default_max_tokens: Optional[int] = Field(None, ge=1, description="Default max tokens")
 
