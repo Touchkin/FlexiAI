@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://github.com/Touchkin/FlexiAI/actions/workflows/tests.yml/badge.svg)](https://github.com/Touchkin/FlexiAI/actions/workflows/tests.yml)
 [![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen.svg)]()
 
 **FlexiAI** is a production-ready Python library that provides a unified interface for multiple GenAI providers with automatic failover capabilities using the circuit breaker pattern.
@@ -19,8 +20,24 @@
 
 ## 📦 Installation
 
+### Install from GitHub Release
+
 ```bash
-pip install flexiai
+# Download the latest release
+gh release download --repo Touchkin/FlexiAI
+
+# Install the wheel file
+pip install flexiai-*.whl
+```
+
+### Install from Git Repository
+
+```bash
+# Install from a specific release tag
+pip install git+https://github.com/Touchkin/FlexiAI.git@v0.3.0
+
+# Or install from main branch (latest development)
+pip install git+https://github.com/Touchkin/FlexiAI.git
 ```
 
 ### Provider-Specific Dependencies
