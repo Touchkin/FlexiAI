@@ -878,4 +878,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ by the FlexiAI Team**
+**Made with ❤️ by the AI Team at WYSA**
