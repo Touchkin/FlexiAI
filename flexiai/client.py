@@ -131,8 +131,15 @@ class FlexiAI:
         sync_config = {}
 
         if self.config and hasattr(self.config, "sync") and self.config.sync:
-            sync_config = self.config.sync if isinstance(self.config.sync, dict) else {}
-            sync_enabled = sync_config.get("enabled", False)
+            # Handle both SyncConfig object and dict
+            if isinstance(self.config.sync, dict):
+                sync_config = self.config.sync
+                sync_enabled = sync_config.get("enabled", False)
+            else:
+                # It's a SyncConfig object
+                sync_enabled = self.config.sync.enabled
+                # Convert to dict for easier access
+                sync_config = self.config.sync.model_dump()
 
         if not sync_enabled:
             return
@@ -147,14 +154,13 @@ class FlexiAI:
 
             if backend_type == "redis":
                 # Try to create Redis backend
-                redis_config = sync_config.get("redis", {})
                 try:
                     backend = RedisSyncBackend(
-                        host=redis_config.get("host", "localhost"),
-                        port=redis_config.get("port", 6379),
-                        db=redis_config.get("db", 0),
-                        password=redis_config.get("password"),
-                        ssl=redis_config.get("ssl", False),
+                        host=sync_config.get("redis_host", "localhost"),
+                        port=sync_config.get("redis_port", 6379),
+                        db=sync_config.get("redis_db", 0),
+                        password=sync_config.get("redis_password"),
+                        ssl=sync_config.get("redis_ssl", False),
                         key_prefix=sync_config.get("key_prefix", "flexiai"),
                         channel=sync_config.get("channel", "flexiai:events"),
                         state_ttl=sync_config.get("state_ttl", 3600),
