@@ -1253,6 +1253,976 @@ Response:
 
 ---
 
+## **PHASE 7: Decorator Support and Multi-Worker Synchronization**
+
+This phase adds two major features:
+1. Simple decorator-based API for easy integration
+2. Multi-worker synchronization for circuit breaker state sharing
+
+---
+
+### Phase 7.1: Decorator API Design and Implementation
+
+**TODO:**
+- [ ] Design decorator API and interface
+- [ ] Implement `@flexiai` decorator for functions
+- [ ] Implement `@flexiai_chat` decorator specifically for chat completions
+- [ ] Support decorator configuration (inline and global)
+- [ ] Handle sync and async functions
+- [ ] Add parameter extraction from function signatures
+- [ ] Implement response injection into function parameters
+- [ ] Add decorator examples and documentation
+
+**Decorator Usage Examples:**
+```python
+# Simple usage - uses global FlexiAI config
+@flexiai_chat
+def generate_response(user_message: str) -> str:
+    """This function will automatically call FlexiAI"""
+    pass
+
+# Usage with inline configuration
+@flexiai_chat(
+    temperature=0.7,
+    max_tokens=1000,
+    model_preference=["gpt-4", "gemini-pro", "claude-3-sonnet"]
+)
+def creative_writer(prompt: str) -> str:
+    pass
+
+# Usage with system message
+@flexiai_chat(
+    system_message="You are a helpful Python coding assistant"
+)
+def code_helper(question: str) -> str:
+    pass
+
+# Advanced usage with custom parameters
+@flexiai_chat(
+    provider="openai",  # Force specific provider
+    fallback=True,      # Enable failover (default: True)
+    stream=False,       # Enable streaming
+    retry_attempts=3
+)
+def specialized_task(input_text: str) -> str:
+    pass
+
+# Async function support
+@flexiai_chat
+async def async_generate(prompt: str) -> str:
+    pass
+
+# Direct FlexiAI instance usage
+my_flexiai = FlexiAI(config)
+
+@my_flexiai.chat
+def custom_instance_func(message: str) -> str:
+    pass
+```
+
+**Instructions for Copilot:**
+
+1. **Create `decorators.py` Module:**
+   - Location: `flexiai/decorators.py`
+   - Implement decorator factory pattern
+   - Support both `@decorator` and `@decorator()` syntax
+
+2. **Decorator Implementation Details:**
+
+```python
+# Core decorator structure:
+
+def flexiai_chat(
+    func=None,
+    *,
+    system_message: Optional[str] = None,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+    model_preference: Optional[List[str]] = None,
+    provider: Optional[str] = None,
+    fallback: bool = True,
+    stream: bool = False,
+    retry_attempts: Optional[int] = None,
+    **kwargs
+):
+    """
+    Decorator to automatically wrap function with FlexiAI chat completion.
+
+    The decorated function should:
+    - Take a string parameter (user message)
+    - Return a string (AI response)
+
+    Args:
+        func: Function to decorate (auto-filled when used without parentheses)
+        system_message: System message for the AI
+        temperature: Sampling temperature
+        max_tokens: Maximum tokens to generate
+        model_preference: List of models in preference order
+        provider: Force specific provider (disables failover)
+        fallback: Enable automatic failover
+        stream: Enable streaming responses
+        retry_attempts: Number of retry attempts
+        **kwargs: Additional parameters passed to FlexiAI
+
+    Example:
+        @flexiai_chat(temperature=0.7)
+        def get_advice(question: str) -> str:
+            pass
+
+        response = get_advice("What is Python?")
+    """
+    pass
+```
+
+3. **Function Signature Analysis:**
+   - Use `inspect` module to analyze function signature
+   - Extract parameter names and types
+   - Identify which parameter is the user message (first string param)
+   - Support type hints: `str`, `List[Dict]`, `messages` parameter
+   - Validate function signature (must have at least one parameter)
+
+4. **Message Construction:**
+   - If function has `str` parameter → treat as user message
+   - If function has `messages: List[Dict]` → pass directly
+   - If system_message provided → prepend to messages
+   - Support conversation history if function maintains state
+
+5. **Response Handling:**
+   - Extract text content from FlexiAI response
+   - Return as string to function caller
+   - If stream=True → return generator
+   - Handle errors gracefully and raise with context
+
+6. **Global Configuration:**
+   - Create `FlexiAI.set_global_config(config)` class method
+   - Decorators use global config if no instance specified
+   - Allow per-decorator override of global config
+
+7. **Integration with FlexiAI Client:**
+   - Decorators should create/use FlexiAI client instance
+   - Support binding decorator to specific FlexiAI instance
+   - Cache client instance for performance
+
+8. **Async Support:**
+   - Detect if decorated function is async (`asyncio.iscoroutinefunction`)
+   - Use AsyncFlexiAI client for async functions
+   - Maintain same API for both sync and async
+
+**Testing Requirements:**
+- [ ] Test decorator with simple function
+- [ ] Test decorator with parameters
+- [ ] Test decorator without parameters
+- [ ] Test async function decoration
+- [ ] Test system message injection
+- [ ] Test parameter extraction
+- [ ] Test error handling
+- [ ] Test streaming responses
+- [ ] Test with custom FlexiAI instance
+- [ ] Test global config vs local config priority
+
+---
+
+### Phase 7.2: Multi-Worker Synchronization Architecture
+
+**TODO:**
+- [ ] Design state synchronization architecture
+- [ ] Implement Redis-based pub/sub for circuit breaker state
+- [ ] Create state synchronization manager
+- [ ] Implement fallback for non-Redis environments
+- [ ] Add distributed locking for state changes
+- [ ] Implement state persistence and recovery
+- [ ] Add synchronization monitoring and metrics
+- [ ] Document multi-worker setup
+
+**Architecture Overview:**
+
+```
+Worker 1                  Redis Pub/Sub              Worker 2
+  |                            |                         |
+  |--[Circuit Opens]---------->|                         |
+  |   Provider: OpenAI         |                         |
+  |   State: OPEN              |                         |
+  |                            |--[Broadcast State]----->|
+  |                            |                         |--[Update Local State]
+  |                            |                         |   Provider: OpenAI
+  |                            |                         |   State: OPEN
+  |                            |                         |
+  |<--[State Update Ack]-------|<------------------------|
+```
+
+**Instructions for Copilot:**
+
+1. **Create `sync/` Module:**
+```
+flexiai/sync/
+├── __init__.py
+├── manager.py           # State synchronization manager
+├── redis_backend.py     # Redis pub/sub implementation
+├── memory_backend.py    # In-memory fallback (single process)
+├── events.py            # Event definitions
+└── serializers.py       # State serialization
+```
+
+2. **State Synchronization Events:**
+
+```python
+# Define event types in events.py
+
+class CircuitBreakerEvent:
+    """Event for circuit breaker state changes"""
+
+    TYPES = {
+        'OPENED': 'circuit.opened',
+        'CLOSED': 'circuit.closed',
+        'HALF_OPEN': 'circuit.half_open',
+        'FAILURE': 'circuit.failure',
+        'SUCCESS': 'circuit.success'
+    }
+
+    def __init__(
+        self,
+        event_type: str,
+        provider_name: str,
+        state: str,
+        failure_count: int,
+        timestamp: float,
+        worker_id: str,
+        metadata: Dict[str, Any]
+    ):
+        pass
+
+class StateUpdateEvent:
+    """Event for general state updates"""
+    pass
+```
+
+3. **Redis Backend Implementation:**
+
+```python
+# In sync/redis_backend.py
+
+class RedisSyncBackend:
+    """
+    Redis-based synchronization backend for multi-worker deployments.
+
+    Uses Redis Pub/Sub for real-time state broadcasting and Redis keys
+    for state persistence.
+
+    Features:
+    - Real-time state synchronization across workers
+    - State persistence for recovery
+    - Distributed locking for atomic operations
+    - Automatic reconnection handling
+    - Health monitoring
+
+    Configuration:
+    {
+        "sync": {
+            "enabled": true,
+            "backend": "redis",
+            "redis": {
+                "host": "localhost",
+                "port": 6379,
+                "db": 0,
+                "password": null,
+                "ssl": false,
+                "key_prefix": "flexiai:",
+                "channel_prefix": "flexiai:events:",
+                "connection_pool": {
+                    "max_connections": 50,
+                    "socket_timeout": 5,
+                    "socket_connect_timeout": 5
+                }
+            },
+            "worker_id": "auto",  # or manual ID
+            "heartbeat_interval": 30,
+            "state_ttl": 3600
+        }
+    }
+    """
+
+    def __init__(self, config: Dict[str, Any]):
+        """Initialize Redis connection and pub/sub"""
+        pass
+
+    def publish_event(self, event: CircuitBreakerEvent) -> bool:
+        """Publish event to all workers"""
+        pass
+
+    def subscribe_to_events(self, callback: Callable) -> None:
+        """Subscribe to state change events"""
+        pass
+
+    def get_provider_state(self, provider_name: str) -> Dict:
+        """Get current state from Redis"""
+        pass
+
+    def set_provider_state(self, provider_name: str, state: Dict) -> bool:
+        """Set state in Redis (with locking)"""
+        pass
+
+    def acquire_lock(self, lock_name: str, timeout: int = 10) -> bool:
+        """Acquire distributed lock"""
+        pass
+
+    def release_lock(self, lock_name: str) -> bool:
+        """Release distributed lock"""
+        pass
+
+    def health_check(self) -> bool:
+        """Check Redis connection health"""
+        pass
+```
+
+4. **Synchronization Manager:**
+
+```python
+# In sync/manager.py
+
+class StateSyncManager:
+    """
+    Manages state synchronization across multiple workers.
+
+    Responsibilities:
+    - Initialize appropriate backend (Redis/Memory)
+    - Coordinate state updates
+    - Handle event broadcasting
+    - Manage worker registration
+    - Monitor synchronization health
+    """
+
+    def __init__(self, config: Dict[str, Any]):
+        """Initialize sync manager with configuration"""
+        # Auto-detect backend or use configured one
+        # Fall back to memory backend if Redis unavailable
+        pass
+
+    def register_circuit_breaker(self, provider_name: str, breaker) -> None:
+        """Register a circuit breaker for synchronization"""
+        pass
+
+    def on_state_change(self, event: CircuitBreakerEvent) -> None:
+        """Handle local state change, broadcast to other workers"""
+        pass
+
+    def on_remote_state_change(self, event: CircuitBreakerEvent) -> None:
+        """Handle state change from another worker"""
+        pass
+
+    def sync_all_states(self) -> None:
+        """Synchronize all circuit breaker states (on startup)"""
+        pass
+
+    def start(self) -> None:
+        """Start synchronization service"""
+        pass
+
+    def stop(self) -> None:
+        """Stop synchronization service gracefully"""
+        pass
+```
+
+5. **Integration with Circuit Breaker:**
+
+```python
+# Modify circuit_breaker/breaker.py
+
+class CircuitBreaker:
+    def __init__(
+        self,
+        config: CircuitBreakerConfig,
+        sync_manager: Optional[StateSyncManager] = None
+    ):
+        """
+        Initialize circuit breaker with optional sync manager
+
+        Args:
+            config: Circuit breaker configuration
+            sync_manager: State synchronization manager for multi-worker
+        """
+        self.sync_manager = sync_manager
+
+        # Register with sync manager if provided
+        if self.sync_manager:
+            self.sync_manager.register_circuit_breaker(
+                self.provider_name,
+                self
+            )
+
+    def _transition_to_open(self):
+        """Transition to OPEN state and broadcast"""
+        # Existing logic...
+
+        # Broadcast state change
+        if self.sync_manager:
+            event = CircuitBreakerEvent(
+                event_type='OPENED',
+                provider_name=self.provider_name,
+                state='OPEN',
+                failure_count=self.failure_count,
+                timestamp=time.time(),
+                worker_id=self.sync_manager.worker_id,
+                metadata={}
+            )
+            self.sync_manager.on_state_change(event)
+
+    def apply_remote_state(self, state: Dict) -> None:
+        """Apply state received from another worker"""
+        with self.lock:
+            self.state = state['state']
+            self.failure_count = state['failure_count']
+            self.last_failure_time = state['last_failure_time']
+            # Update other relevant fields
+
+        logger.info(
+            f"Applied remote state for {self.provider_name}: {state['state']}"
+        )
+```
+
+6. **Update FlexiAI Client:**
+
+```python
+# In client.py
+
+class FlexiAI:
+    def __init__(self, config: Union[Dict, FlexiAIConfig]):
+        """Initialize FlexiAI with optional sync support"""
+        # Existing initialization...
+
+        # Initialize state synchronization if enabled
+        self.sync_manager = None
+        if config.get('sync', {}).get('enabled', False):
+            self.sync_manager = StateSyncManager(config['sync'])
+            self.sync_manager.start()
+
+            # Pass sync manager to circuit breakers
+            for provider in self.providers:
+                provider.circuit_breaker.sync_manager = self.sync_manager
+                self.sync_manager.register_circuit_breaker(
+                    provider.name,
+                    provider.circuit_breaker
+                )
+
+    def close(self):
+        """Gracefully shutdown FlexiAI and sync manager"""
+        if self.sync_manager:
+            self.sync_manager.stop()
+        # Other cleanup...
+```
+
+7. **Worker ID Generation:**
+
+```python
+# In sync/manager.py or utils/
+
+def generate_worker_id() -> str:
+    """
+    Generate unique worker ID
+
+    Format: {hostname}:{pid}:{timestamp}
+    Example: web-server-01:12345:1234567890
+    """
+    import socket
+    import os
+    import time
+
+    hostname = socket.gethostname()
+    pid = os.getpid()
+    timestamp = int(time.time())
+
+    return f"{hostname}:{pid}:{timestamp}"
+```
+
+8. **State Serialization:**
+
+```python
+# In sync/serializers.py
+
+class StateSerializer:
+    """Serialize/deserialize circuit breaker state for transmission"""
+
+    @staticmethod
+    def serialize(state: Dict) -> str:
+        """Convert state dict to JSON string"""
+        return json.dumps(state)
+
+    @staticmethod
+    def deserialize(data: str) -> Dict:
+        """Convert JSON string to state dict"""
+        return json.loads(data)
+
+    @staticmethod
+    def serialize_event(event: CircuitBreakerEvent) -> str:
+        """Serialize event for pub/sub"""
+        return json.dumps({
+            'event_type': event.event_type,
+            'provider_name': event.provider_name,
+            'state': event.state,
+            'failure_count': event.failure_count,
+            'timestamp': event.timestamp,
+            'worker_id': event.worker_id,
+            'metadata': event.metadata
+        })
+
+    @staticmethod
+    def deserialize_event(data: str) -> CircuitBreakerEvent:
+        """Deserialize event from pub/sub"""
+        obj = json.loads(data)
+        return CircuitBreakerEvent(**obj)
+```
+
+9. **Dependencies:**
+   - Add to `requirements.txt`:
+     ```
+     redis>=4.5.0
+     hiredis>=2.0.0  # For better performance
+     ```
+   - Make Redis optional (use extras):
+     ```python
+     # In setup.py
+     extras_require={
+         'redis': ['redis>=4.5.0', 'hiredis>=2.0.0'],
+         'sync': ['redis>=4.5.0', 'hiredis>=2.0.0'],  # Alias
+     }
+     ```
+
+10. **Configuration Example:**
+
+```python
+# Multi-worker configuration
+config = {
+    "providers": [...],
+    "sync": {
+        "enabled": True,
+        "backend": "redis",  # or "memory" for single process
+        "redis": {
+            "host": "localhost",
+            "port": 6379,
+            "db": 0,
+            "password": None,
+            "ssl": False,
+            "key_prefix": "flexiai:",
+            "channel": "flexiai:circuit_breaker"
+        },
+        "worker_id": "auto",  # Auto-generate or specify manually
+        "heartbeat_interval": 30,  # Seconds
+        "state_ttl": 3600,  # State expiry in Redis (seconds)
+        "sync_on_startup": True,  # Sync states when starting
+        "health_check_interval": 60  # Check Redis health
+    }
+}
+```
+
+**Testing Requirements:**
+- [ ] Test Redis connection and pub/sub
+- [ ] Test state synchronization between workers (use multiprocessing)
+- [ ] Test distributed locking
+- [ ] Test state persistence and recovery
+- [ ] Test Redis connection failure handling
+- [ ] Test fallback to memory backend
+- [ ] Test worker registration and heartbeat
+- [ ] Test concurrent state updates
+- [ ] Test event serialization/deserialization
+- [ ] Integration test with uvicorn workers
+
+---
+
+### Phase 7.3: Uvicorn Multi-Worker Integration
+
+**TODO:**
+- [ ] Create uvicorn deployment examples
+- [ ] Document Redis setup for production
+- [ ] Add health check endpoints for monitoring
+- [ ] Document scaling best practices
+- [ ] Add monitoring and observability guide
+
+**Instructions for Copilot:**
+
+1. **Create Example FastAPI Application:**
+
+```python
+# In examples/fastapi_multiworker/app.py
+
+from fastapi import FastAPI, HTTPException
+from flexiai import FlexiAI
+from flexiai.decorators import flexiai_chat
+from pydantic import BaseModel
+import os
+
+# Initialize FlexiAI with Redis sync
+flexiai_config = {
+    "providers": [
+        {
+            "name": "openai",
+            "priority": 1,
+            "api_key": os.getenv("OPENAI_API_KEY"),
+            "model": "gpt-4o-mini"
+        },
+        {
+            "name": "anthropic",
+            "priority": 2,
+            "api_key": os.getenv("ANTHROPIC_API_KEY"),
+            "model": "claude-3-sonnet-20240229"
+        }
+    ],
+    "sync": {
+        "enabled": True,
+        "backend": "redis",
+        "redis": {
+            "host": os.getenv("REDIS_HOST", "localhost"),
+            "port": int(os.getenv("REDIS_PORT", 6379)),
+            "db": 0,
+            "password": os.getenv("REDIS_PASSWORD")
+        }
+    }
+}
+
+# Global FlexiAI instance (shared across requests in same worker)
+flexiai_client = FlexiAI(flexiai_config)
+
+app = FastAPI(title="FlexiAI Multi-Worker Example")
+
+class ChatRequest(BaseModel):
+    message: str
+    temperature: float = 0.7
+
+class ChatResponse(BaseModel):
+    response: str
+    provider: str
+    model: str
+
+# Method 1: Using decorator
+@app.post("/chat/decorated")
+@flexiai_chat(temperature=0.7)
+def chat_with_decorator(message: str) -> str:
+    """Endpoint using decorator - simplest approach"""
+    pass
+
+# Method 2: Using client directly
+@app.post("/chat/direct", response_model=ChatResponse)
+async def chat_direct(request: ChatRequest):
+    """Endpoint using FlexiAI client directly"""
+    try:
+        response = flexiai_client.chat_completion(
+            messages=[{"role": "user", "content": request.message}],
+            temperature=request.temperature
+        )
+
+        return ChatResponse(
+            response=response.content,
+            provider=response.provider,
+            model=response.model
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Health check endpoint
+@app.get("/health")
+def health_check():
+    """Health check including provider status"""
+    try:
+        provider_status = flexiai_client.get_provider_status()
+        redis_healthy = flexiai_client.sync_manager.health_check() if flexiai_client.sync_manager else True
+
+        return {
+            "status": "healthy",
+            "providers": provider_status,
+            "redis_sync": redis_healthy,
+            "worker_id": flexiai_client.sync_manager.worker_id if flexiai_client.sync_manager else None
+        }
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+# Graceful shutdown
+@app.on_event("shutdown")
+def shutdown_event():
+    """Cleanup on shutdown"""
+    flexiai_client.close()
+
+# Run with: uvicorn app:app --workers 4 --host 0.0.0.0 --port 8000
+```
+
+2. **Create Deployment Documentation:**
+
+```markdown
+# In docs/multi_worker_deployment.md
+
+# Multi-Worker Deployment Guide
+
+## Overview
+FlexiAI supports multi-worker deployments with synchronized circuit breaker state using Redis pub/sub. This ensures that when a provider fails in one worker, all other workers are immediately notified and adjust their behavior accordingly.
+
+## Prerequisites
+- Redis server (version 6.0+)
+- Python 3.8+
+- uvicorn for ASGI deployment
+
+## Setup
+
+### 1. Install FlexiAI with Redis Support
+```bash
+pip install flexiai[redis]
+```
+
+### 2. Configure Redis
+```bash
+# Start Redis server
+redis-server
+```
+
+### 3. Configure FlexiAI
+See configuration example in Phase 7.2
+
+### 4. Deploy with Uvicorn
+```bash
+# Development
+uvicorn app:app --workers 4 --reload
+
+# Production
+uvicorn app:app \
+  --workers 4 \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --access-log \
+  --log-level info
+```
+
+## Architecture
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Worker 1   │     │  Worker 2   │     │  Worker 3   │
+│  PID: 1001  │     │  PID: 1002  │     │  PID: 1003  │
+└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+       │                   │                   │
+       └───────────────────┼───────────────────┘
+                           │
+                    ┌──────▼──────┐
+                    │    Redis    │
+                    │   Pub/Sub   │
+                    └─────────────┘
+```
+
+## Benefits
+
+1. **Instant Failover Coordination**: All workers know immediately when a provider fails
+2. **Reduced Duplicate Failures**: Workers don't waste time on providers known to be down
+3. **Consistent Behavior**: All workers make similar provider choices
+4. **State Persistence**: Circuit breaker state survives worker restarts
+
+## Monitoring
+
+Monitor circuit breaker state using Redis CLI:
+```bash
+redis-cli
+> KEYS flexiai:*
+> GET flexiai:circuit:openai
+> SUBSCRIBE flexiai:events:circuit_breaker
+```
+
+## Troubleshooting
+
+See troubleshooting section...
+```
+
+**Testing Requirements:**
+- [ ] Test with 2+ uvicorn workers locally
+- [ ] Test state sync between workers (trigger failure in one, verify others see it)
+- [ ] Test worker startup/shutdown scenarios
+- [ ] Test Redis connection failure and recovery
+- [ ] Load test with multiple workers
+- [ ] Verify health check endpoints
+- [ ] Test graceful shutdown
+
+---
+
+### Phase 7.4: Documentation and Examples for New Features
+
+**TODO:**
+- [ ] Update main README with decorator examples
+- [ ] Create decorator usage guide
+- [ ] Create multi-worker deployment guide
+- [ ] Add troubleshooting for Redis issues
+- [ ] Document performance implications
+- [ ] Add best practices for production deployment
+- [ ] Create migration guide for adding sync to existing deployments
+
+**Instructions for Copilot:**
+
+1. **Update README.md with Quick Start:**
+
+```markdown
+## Quick Start with Decorators
+
+The simplest way to use FlexiAI:
+
+```python
+from flexiai import FlexiAI
+from flexiai.decorators import flexiai_chat
+import os
+
+# Configure once
+FlexiAI.set_global_config({
+    "providers": [
+        {"name": "openai", "api_key": os.getenv("OPENAI_API_KEY"), "priority": 1},
+        {"name": "anthropic", "api_key": os.getenv("ANTHROPIC_API_KEY"), "priority": 2}
+    ]
+})
+
+# Use anywhere with decorator
+@flexiai_chat
+def ask_ai(question: str) -> str:
+    pass
+
+# That's it! Automatic failover included.
+response = ask_ai("What is Python?")
+print(response)
+```
+
+## Multi-Worker Deployment
+
+FlexiAI automatically synchronizes circuit breaker state across workers using Redis:
+
+```python
+# Enable sync in configuration
+config = {
+    "providers": [...],
+    "sync": {
+        "enabled": True,
+        "redis": {"host": "localhost", "port": 6379}
+    }
+}
+
+# Deploy with uvicorn
+# uvicorn app:app --workers 4
+```
+
+When one worker detects a provider failure, all workers are notified instantly.
+```
+
+2. **Create Comprehensive Examples:**
+   - `examples/decorator_basic.py` - Simple decorator usage
+   - `examples/decorator_advanced.py` - Advanced features
+   - `examples/decorator_async.py` - Async function decoration
+   - `examples/fastapi_single_worker.py` - Single worker FastAPI
+   - `examples/fastapi_multiworker/` - Complete multi-worker setup
+
+3. **Performance Documentation:**
+   - Document overhead of decorator (should be minimal)
+   - Document Redis latency impact (< 5ms typically)
+   - Provide benchmarks for different configurations
+   - Document scaling characteristics
+
+---
+
+## Updated Development Workflow
+
+### Working with Decorators:
+
+```python
+# Pattern 1: Global configuration
+FlexiAI.set_global_config(config)
+
+@flexiai_chat
+def my_function(prompt: str) -> str:
+    pass
+
+# Pattern 2: Instance-specific
+my_ai = FlexiAI(config)
+
+@my_ai.chat
+def my_function(prompt: str) -> str:
+    pass
+
+# Pattern 3: Inline configuration
+@flexiai_chat(temperature=0.9, max_tokens=500)
+def creative_function(prompt: str) -> str:
+    pass
+```
+
+### Multi-Worker Testing:
+
+```bash
+# Terminal 1: Start Redis
+redis-server
+
+# Terminal 2: Start app with multiple workers
+uvicorn app:app --workers 4
+
+# Terminal 3: Monitor Redis
+redis-cli MONITOR
+
+# Terminal 4: Make requests and observe sync
+curl -X POST http://localhost:8000/chat -d '{"message": "test"}'
+```
+
+---
+
+## Updated Package Dependencies
+
+Add to `requirements.txt`:
+```
+redis>=4.5.0
+hiredis>=2.0.0
+```
+
+Add to `setup.py`:
+```python
+extras_require={
+    'redis': ['redis>=4.5.0', 'hiredis>=2.0.0'],
+    'sync': ['redis>=4.5.0', 'hiredis>=2.0.0'],
+    'all': ['redis>=4.5.0', 'hiredis>=2.0.0']
+}
+```
+
+---
+
+## Integration Points with Existing Code
+
+### 1. FlexiAI Client (client.py):
+- Add `set_global_config()` class method
+- Add sync_manager initialization
+- Add `close()` method for cleanup
+- Add `chat` decorator property for instance-based decoration
+
+### 2. Circuit Breaker (circuit_breaker/breaker.py):
+- Add `sync_manager` parameter to constructor
+- Add event broadcasting on state transitions
+- Add `apply_remote_state()` method
+- Ensure thread-safe state updates
+
+### 3. Provider Base (providers/base.py):
+- Ensure circuit breaker is accessible
+- Support sync manager passthrough
+
+---
+
+## Copilot Agent Additional Instructions for Phase 7
+
+**When implementing decorators:**
+1. Use `functools.wraps` to preserve function metadata
+2. Support both `@decorator` and `@decorator()` syntax
+3. Handle both sync and async functions correctly
+4. Provide clear error messages for incorrect usage
+5. Test with various function signatures
+
+**When implementing Redis sync:**
+1. Handle Redis connection failures gracefully
+2. Implement automatic reconnection with exponential backoff
+3. Use connection pooling for performance
+4. Ensure thread-safe operations
+5. Test with actual multiprocessing (not just threads)
+6. Monitor Redis memory usage
+
+**Testing multi-worker sync:**
+1. Use `multiprocessing` module to simulate multiple workers
+2. Test with actual Redis server (not mock)
+3. Verify state sync latency is acceptable (< 10ms)
+4. Test failure scenarios (Redis down, network issues)
+5. Verify no race conditions in state updates
+
+---
+
 ## Development Guidelines for GitHub Copilot
 
 ### Code Style and Standards

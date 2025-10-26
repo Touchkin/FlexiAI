@@ -799,6 +799,245 @@
 
 ---
 
+## 🎯 PHASE 7: Decorator Support and Multi-Worker Synchronization
+
+### Phase 7.1: Decorator API Design and Implementation
+**Goal**: Add simple decorator-based API for easy integration
+
+#### Core Decorator Implementation
+- [ ] Design decorator API and interface
+- [ ] Create `flexiai/decorators.py` module
+- [ ] Implement `@flexiai_chat` decorator for chat completions
+- [ ] Implement `@flexiai` general-purpose decorator
+- [ ] Support decorator configuration (inline and global)
+- [ ] Handle sync and async functions automatically
+- [ ] Add parameter extraction from function signatures using `inspect` module
+- [ ] Implement response injection into function parameters
+- [ ] Create `FlexiAI.set_global_config()` class method for global configuration
+- [ ] Add decorator property to FlexiAI instance for `@instance.chat` usage
+
+#### Function Signature Analysis
+- [ ] Use `inspect` module to analyze function signatures
+- [ ] Extract parameter names and types
+- [ ] Identify user message parameter (first string param)
+- [ ] Support type hints: `str`, `List[Dict]`, `messages` parameter
+- [ ] Validate function signature (must have at least one parameter)
+- [ ] Handle various function signature patterns
+
+#### Message Construction & Response Handling
+- [ ] Implement message construction from function parameters
+- [ ] Handle `str` parameter → treat as user message
+- [ ] Handle `messages: List[Dict]` → pass directly
+- [ ] Support system message injection if provided in decorator
+- [ ] Extract text content from FlexiAI response
+- [ ] Return as string to function caller
+- [ ] Support streaming responses (return generator if stream=True)
+- [ ] Handle errors gracefully with context
+
+#### Async Support
+- [ ] Detect async functions using `asyncio.iscoroutinefunction`
+- [ ] Use AsyncFlexiAI client for async functions
+- [ ] Maintain same API for both sync and async
+- [ ] Test with various async patterns
+
+#### Testing
+- [ ] Test decorator with simple function
+- [ ] Test decorator with parameters (@decorator())
+- [ ] Test decorator without parameters (@decorator)
+- [ ] Test async function decoration
+- [ ] Test system message injection
+- [ ] Test parameter extraction from various signatures
+- [ ] Test error handling in decorated functions
+- [ ] Test streaming responses
+- [ ] Test with custom FlexiAI instance
+- [ ] Test global config vs local config priority
+- [ ] Add examples for all decorator patterns
+
+---
+
+### Phase 7.2: Multi-Worker Synchronization Architecture
+**Goal**: Enable circuit breaker state synchronization across multiple workers using Redis
+
+#### Architecture Design & Module Creation
+- [ ] Design state synchronization architecture
+- [ ] Create `flexiai/sync/` module structure:
+  - [ ] `__init__.py`
+  - [ ] `manager.py` - State synchronization manager
+  - [ ] `redis_backend.py` - Redis pub/sub implementation
+  - [ ] `memory_backend.py` - In-memory fallback (single process)
+  - [ ] `events.py` - Event definitions
+  - [ ] `serializers.py` - State serialization
+- [ ] Define CircuitBreakerEvent class with event types (OPENED, CLOSED, HALF_OPEN, FAILURE, SUCCESS)
+- [ ] Define StateUpdateEvent class
+
+#### Redis Backend Implementation
+- [ ] Implement `RedisSyncBackend` class
+- [ ] Initialize Redis connection and connection pooling
+- [ ] Implement `publish_event()` method
+- [ ] Implement `subscribe_to_events()` method with callback
+- [ ] Implement `get_provider_state()` from Redis
+- [ ] Implement `set_provider_state()` with distributed locking
+- [ ] Implement `acquire_lock()` for distributed locking
+- [ ] Implement `release_lock()` for lock cleanup
+- [ ] Implement `health_check()` for Redis connectivity
+- [ ] Add automatic reconnection handling
+- [ ] Implement state persistence with TTL
+
+#### State Synchronization Manager
+- [ ] Implement `StateSyncManager` class
+- [ ] Auto-detect backend (Redis/Memory) or use configured
+- [ ] Implement fallback to memory backend if Redis unavailable
+- [ ] Implement `register_circuit_breaker()` method
+- [ ] Implement `on_state_change()` - handle local state change, broadcast
+- [ ] Implement `on_remote_state_change()` - handle remote worker state changes
+- [ ] Implement `sync_all_states()` for startup synchronization
+- [ ] Implement `start()` and `stop()` lifecycle methods
+- [ ] Add worker registration and heartbeat mechanism
+- [ ] Implement worker ID generation (hostname:pid:timestamp)
+
+#### Circuit Breaker Integration
+- [ ] Modify `CircuitBreaker` class to accept `sync_manager` parameter
+- [ ] Add event broadcasting on state transitions (OPEN, CLOSED, HALF_OPEN)
+- [ ] Implement `apply_remote_state()` method
+- [ ] Ensure thread-safe state updates with locks
+- [ ] Register circuit breaker with sync manager on initialization
+- [ ] Test state synchronization between circuit breakers
+
+#### FlexiAI Client Integration
+- [ ] Update `FlexiAI.__init__()` to initialize sync_manager if enabled
+- [ ] Start sync_manager service
+- [ ] Pass sync_manager to circuit breakers
+- [ ] Implement `close()` method for graceful shutdown
+- [ ] Handle sync_manager cleanup on shutdown
+
+#### State Serialization
+- [ ] Implement `StateSerializer` class
+- [ ] Create `serialize()` method for state dict → JSON
+- [ ] Create `deserialize()` method for JSON → state dict
+- [ ] Create `serialize_event()` for CircuitBreakerEvent
+- [ ] Create `deserialize_event()` from JSON
+
+#### Configuration Support
+- [ ] Add sync configuration to config schema
+- [ ] Support Redis host, port, password, SSL options
+- [ ] Add worker_id configuration (auto or manual)
+- [ ] Add heartbeat_interval, state_ttl settings
+- [ ] Add key_prefix and channel_prefix for Redis
+- [ ] Document all sync configuration options
+
+#### Dependencies & Packaging
+- [ ] Add `redis>=4.5.0` to requirements.txt
+- [ ] Add `hiredis>=2.0.0` for better performance
+- [ ] Update setup.py with extras_require for 'redis' and 'sync'
+- [ ] Make Redis optional with graceful fallback
+
+#### Testing
+- [ ] Test Redis connection and pub/sub
+- [ ] Test state synchronization between workers (use multiprocessing)
+- [ ] Test distributed locking mechanisms
+- [ ] Test state persistence and recovery
+- [ ] Test Redis connection failure handling
+- [ ] Test fallback to memory backend
+- [ ] Test worker registration and heartbeat
+- [ ] Test concurrent state updates and race conditions
+- [ ] Test event serialization/deserialization
+- [ ] Integration test with actual multiprocessing
+- [ ] Test with uvicorn workers
+
+---
+
+### Phase 7.3: Uvicorn Multi-Worker Integration
+**Goal**: Document and test FlexiAI in production multi-worker environments
+
+#### Example Applications
+- [ ] Create `examples/fastapi_multiworker/` directory
+- [ ] Create `app.py` - FastAPI application with FlexiAI
+- [ ] Implement health check endpoint with provider status
+- [ ] Implement graceful shutdown handler
+- [ ] Show both decorator and direct client usage
+- [ ] Add Redis configuration example
+- [ ] Document uvicorn deployment command
+
+#### Deployment Documentation
+- [ ] Create `docs/multi_worker_deployment.md`
+- [ ] Document prerequisites (Redis, Python, uvicorn)
+- [ ] Add Redis setup instructions
+- [ ] Document FlexiAI configuration for multi-worker
+- [ ] Add architecture diagrams (ASCII art or references)
+- [ ] Document benefits of state synchronization
+- [ ] Add monitoring section (Redis CLI commands)
+- [ ] Create troubleshooting guide for multi-worker issues
+
+#### Production Best Practices
+- [ ] Document Redis production setup (clustering, persistence)
+- [ ] Add health check endpoints for monitoring
+- [ ] Document scaling best practices
+- [ ] Add performance considerations
+- [ ] Document security considerations (Redis auth, SSL)
+- [ ] Add observability and monitoring guide
+
+#### Testing Multi-Worker Setup
+- [ ] Test with 2+ uvicorn workers locally
+- [ ] Test state sync between workers (trigger failure in one, verify others)
+- [ ] Test worker startup/shutdown scenarios
+- [ ] Test Redis connection failure and recovery
+- [ ] Load test with multiple workers
+- [ ] Verify health check endpoints work
+- [ ] Test graceful shutdown doesn't lose state
+- [ ] Test worker crashes and state recovery
+
+---
+
+### Phase 7.4: Documentation and Examples for New Features
+**Goal**: Comprehensive documentation for decorators and multi-worker features
+
+#### README Updates
+- [ ] Add "Quick Start with Decorators" section to README.md
+- [ ] Add decorator examples (simple, advanced, async)
+- [ ] Add "Multi-Worker Deployment" section
+- [ ] Document automatic state synchronization
+- [ ] Add comparison: before/after decorator usage
+- [ ] Update installation instructions for Redis support
+
+#### Decorator Examples
+- [ ] Create `examples/decorator_basic.py` - Simple decorator usage
+- [ ] Create `examples/decorator_advanced.py` - Advanced features (custom config, system messages)
+- [ ] Create `examples/decorator_async.py` - Async function decoration
+- [ ] Create `examples/decorator_instance.py` - Instance-based decoration
+- [ ] Add comprehensive comments and documentation
+
+#### Multi-Worker Examples
+- [ ] Create `examples/fastapi_single_worker.py` - Single worker baseline
+- [ ] Create complete `examples/fastapi_multiworker/` project
+  - [ ] app.py - FastAPI application
+  - [ ] requirements.txt - Dependencies
+  - [ ] README.md - Setup and run instructions
+  - [ ] docker-compose.yml - Redis + app setup (optional)
+- [ ] Add example monitoring scripts
+
+#### Performance Documentation
+- [ ] Document decorator overhead (benchmarks)
+- [ ] Document Redis latency impact
+- [ ] Provide performance benchmarks for different configurations
+- [ ] Document scaling characteristics
+- [ ] Add performance tuning guide
+
+#### API Documentation
+- [ ] Add decorator API reference
+- [ ] Document all decorator parameters
+- [ ] Document sync configuration options
+- [ ] Add troubleshooting section for decorators
+- [ ] Add troubleshooting section for Redis sync
+- [ ] Document error messages and solutions
+
+#### Migration Guides
+- [ ] Create migration guide for adding decorators to existing code
+- [ ] Create migration guide for adding sync to single-worker deployments
+- [ ] Document breaking changes (if any)
+- [ ] Provide before/after code examples
+
+---
+
 ## 📊 Progress Tracking
 
 - **Phase 1**: ✅ Complete (100%) - Core Foundation + OpenAI Support
@@ -815,9 +1054,14 @@
 - **Phase 4**: 📋 Not Started - Advanced Features
 - **Phase 5**: 📋 Not Started - Testing, Documentation, and Release
 - **Phase 6**: 📋 Not Started - Post-Release Maintenance
+- **Phase 7**: 📋 **NEW** - Decorator Support and Multi-Worker Synchronization
+  - Phase 7.1: Decorator API Design and Implementation (Not Started)
+  - Phase 7.2: Multi-Worker Synchronization Architecture (Not Started)
+  - Phase 7.3: Uvicorn Multi-Worker Integration (Not Started)
+  - Phase 7.4: Documentation and Examples (Not Started)
 
 ---
 
-**Last Updated**: December 2024
-**Current Status**: Phase 3 Complete - Ready for Phase 4 or Release
-**Next Milestone**: Merge branches and tag v0.3.0 release
+**Last Updated**: October 26, 2025
+**Current Status**: Phase 3 Complete - New Phase 7 Requirements Added
+**Next Milestone**: Choose between Phase 4 (Advanced Features), Phase 5 (Release), or Phase 7 (Decorators + Multi-Worker)
