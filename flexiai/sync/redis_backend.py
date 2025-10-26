@@ -73,18 +73,30 @@ class RedisSyncBackend(BaseSyncBackend):
         self.state_ttl = state_ttl
 
         # Create Redis connection pool
-        self._pool = redis.ConnectionPool(
-            host=host,
-            port=port,
-            db=db,
-            password=password,
-            ssl=ssl,
-            socket_timeout=socket_timeout,
-            socket_connect_timeout=socket_connect_timeout,
-            decode_responses=True,
-        )
+        # Note: In redis-py 7.0+, SSL is handled via connection_class parameter
+        if ssl:
+            self._client = redis.Redis(
+                host=host,
+                port=port,
+                db=db,
+                password=password,
+                ssl=True,
+                socket_timeout=socket_timeout,
+                socket_connect_timeout=socket_connect_timeout,
+                decode_responses=True,
+            )
+        else:
+            self._client = redis.Redis(
+                host=host,
+                port=port,
+                db=db,
+                password=password,
+                socket_timeout=socket_timeout,
+                socket_connect_timeout=socket_connect_timeout,
+                decode_responses=True,
+            )
 
-        self._client = redis.Redis(connection_pool=self._pool)
+        self._pool = self._client.connection_pool
         self._pubsub = None
         self._pubsub_thread = None
         self._serializer = StateSerializer()
