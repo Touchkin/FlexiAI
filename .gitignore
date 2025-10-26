@@ -156,3 +156,5 @@ flexiai.log
 config.json
 .flexiai/
 .env.test
+dev-gemini-427512-71ac4bd1f35d.json
+*.json
