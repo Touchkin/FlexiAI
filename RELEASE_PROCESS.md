@@ -105,8 +105,9 @@ Once the release is published, GitHub Actions will automatically:
 
 1. ✅ Build the package (wheel and source distribution)
 2. ✅ Run quality checks with `twine check`
-3. ✅ Sign packages with Sigstore
-4. ✅ Upload distributions to GitHub Release
+3. ✅ Upload distributions to GitHub Release
+
+**Note:** The workflow runs on self-hosted runners with the label `[self-hosted, Linux, X64, python36]`.
 
 Monitor the workflow:
 ```bash
@@ -224,7 +225,6 @@ Before publishing:
 
 After publishing:
 
-- [ ] PyPI package available
 - [ ] GitHub release created
 - [ ] Distributions attached to release
 - [ ] Installation tested from GitHub release
@@ -238,6 +238,13 @@ After publishing:
 - Check that the release was published (not draft)
 - Verify GitHub Actions has write permissions
 - Check the release tag matches the workflow trigger
+- Ensure self-hosted runner is online and available
+
+### Workflow fails with "No runner available"
+
+- Verify self-hosted runner is registered and online
+- Check runner labels match: `[self-hosted, Linux, X64, python36]`
+- Restart the runner if needed
 
 ### Package build fails
 
@@ -250,16 +257,13 @@ After publishing:
 - Run tests locally: `pytest tests/`
 - Check Python version compatibility
 - Review test logs in GitHub Actions
-
-### Sigstore signing fails
-
-- This is optional - the workflow will continue
-- Check Sigstore status: https://status.sigstore.dev/
+- Ensure self-hosted runner has required dependencies
 
 ## Resources
 
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github)
+- [Self-hosted Runners](https://docs.github.com/en/actions/hosting-your-own-runners)
 - [Python Packaging Guide](https://packaging.python.org/)
 - [Semantic Versioning](https://semver.org/)
 - [Sigstore](https://www.sigstore.dev/)
