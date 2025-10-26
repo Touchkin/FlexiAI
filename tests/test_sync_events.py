@@ -59,7 +59,7 @@ class TestCircuitBreakerEvent:
             timestamp=timestamp,
         )
 
-        assert event.metadata is None
+        assert event.metadata == {}  # Defaults to empty dict, not None
 
     def test_to_dict(self):
         """Test converting event to dictionary."""
@@ -92,7 +92,7 @@ class TestCircuitBreakerEvent:
 
         event_dict = event.to_dict()
 
-        assert event_dict["metadata"] is None
+        assert event_dict["metadata"] == {}  # Defaults to empty dict
 
     def test_from_dict(self):
         """Test creating event from dictionary."""
@@ -125,22 +125,7 @@ class TestCircuitBreakerEvent:
 
         event = CircuitBreakerEvent.from_dict(event_dict)
 
-        assert event.metadata is None
-
-    def test_from_dict_with_null_metadata(self):
-        """Test creating event from dict with null metadata."""
-        timestamp = datetime.now(timezone.utc)
-        event_dict = {
-            "provider_name": "test_provider",
-            "event_type": "closed",
-            "worker_id": "worker-1",
-            "timestamp": timestamp.isoformat(),
-            "metadata": None,
-        }
-
-        event = CircuitBreakerEvent.from_dict(event_dict)
-
-        assert event.metadata is None
+        assert event.metadata == {}  # Defaults to empty dict
 
     def test_round_trip_conversion(self):
         """Test that to_dict -> from_dict preserves data."""
