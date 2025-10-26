@@ -5,45 +5,105 @@ All notable changes to FlexiAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-10-26
+
+### Added - Phase 7 Complete: Decorator Support + Multi-Worker Synchronization
+
+**🎨 Phase 7.1: Decorator API**
+- Added `@flexiai_chat_completion` decorator for simplified LLM integration
+  - Clean, Pythonic interface for chat completions
+  - Automatic provider selection and failover
+  - Full parameter support (temperature, max_tokens, system_message, etc.)
+  - Works with both sync and async functions
+  - Type-safe with proper type hints
+- Added 3 comprehensive decorator examples:
+  - `examples/decorator_basic.py` - Basic usage patterns
+  - `examples/decorator_advanced.py` - Multi-provider with explicit selection
+  - `examples/decorator_async.py` - Async/concurrent usage
+- 36 decorator unit tests (91% coverage on decorators.py)
+- All examples tested with real API calls
+
+**🔄 Phase 7.2: Multi-Worker Synchronization**
+- Added `flexiai/sync/` module (8 files, 957 lines) for distributed state synchronization:
+  - `BaseSyncBackend` - Abstract interface for sync backends
+  - `MemorySyncBackend` - Single-worker/development mode (in-memory state)
+  - `RedisSyncBackend` - Production multi-worker mode with Redis pub/sub
+  - `StateSyncManager` - Coordinates state sync across workers
+  - `CircuitBreakerEvent` & `StateUpdateEvent` - State change events
+  - `StateSerializer` - JSON serialization with datetime/enum support
+- Circuit breaker state synchronization across workers:
+  - Real-time event broadcasting via Redis pub/sub
+  - Distributed state storage with configurable TTL
+  - Automatic state recovery on worker startup
+  - Thread-safe state serialization
+- 64 sync unit tests (89% coverage on sync module)
+- 14 Redis integration tests + 2 circuit breaker sync tests
+- Verified with real Redis pub/sub in multi-worker environment
+
+**🚀 Phase 7.3: Production Multi-Worker Deployment**
+- Production-ready FastAPI application (`examples/fastapi_multiworker/`):
+  - Complete multi-worker example (610 lines)
+  - Comprehensive health check endpoints:
+    - `/health` - Full health status with provider details
+    - `/health/ready` - Kubernetes readiness probe
+    - `/health/live` - Kubernetes liveness probe
+  - Chat completion endpoints:
+    - `/chat/direct` - Direct FlexiAI client usage
+    - `/chat/decorator` - Decorator-based usage
+  - Provider management endpoints:
+    - `/providers` - Get provider status
+    - `/providers/{name}/reset` - Reset circuit breakers
+  - Metrics endpoint: `/metrics` - Prometheus-compatible metrics
+  - Graceful startup/shutdown with lifespan management
+  - Structured logging with worker identification
+  - Docker Compose setup for easy deployment
+  - Kubernetes manifests with HPA
+- Comprehensive deployment documentation (1,300+ lines):
+  - `docs/multi_worker_deployment.md` (682 lines):
+    - Architecture overview with ASCII diagrams
+    - Quick start guide (5-minute setup)
+    - 4 deployment scenarios (single, multiple, Docker, K8s)
+    - Load balancing configs (Nginx, HAProxy, Kubernetes)
+    - Monitoring and observability guide
+    - Troubleshooting and performance tuning
+  - `docs/production_best_practices.md` (650 lines):
+    - Redis production setup (Sentinel, Cluster, persistence)
+    - 3-tier health check strategies
+    - Scaling guidelines (vertical and horizontal)
+    - Performance optimization (connection pooling, caching, batching)
+    - Security hardening (auth, TLS, secrets management, rate limiting)
+    - Observability (structured logging, Prometheus, tracing)
+    - Disaster recovery procedures
+    - Production readiness checklist
+
+**✅ Testing & Quality**
+- 599 total tests passing (up from 461 in v0.3.0)
+- 90% code coverage (up from 87%)
+- All Phase 7 components fully tested:
+  - 36 decorator tests
+  - 64 sync unit tests
+  - 14 Redis integration tests
+  - 2 circuit breaker sync integration tests
+- All pre-commit hooks passing
+- All examples tested with real API calls
+
+### Changed
+- Updated `FlexiAI` client to support optional sync manager
+- Updated `CircuitBreaker` to broadcast state changes when sync is enabled
+- Updated `ProviderRegistry` to pass sync manager to circuit breakers
+- Improved error handling and logging throughout
+- Enhanced documentation with real-world examples
+
+### Documentation
+- Added comprehensive Phase 7 documentation
+- Updated README with decorator examples
+- Created production deployment guides
+- Added Docker and Kubernetes deployment configs
+- Updated TODO.md with Phase 7 completion status
+
 ## [Unreleased]
 
 ### Added
-- **Phase 7.2: Multi-Worker Synchronization Architecture (In Progress)**
-  - Added `flexiai/sync/` module for distributed state synchronization
-  - Implemented `BaseSyncBackend` abstract interface for sync backends
-  - Implemented `MemorySyncBackend` for single-worker/development environments
-  - Implemented `RedisSyncBackend` for multi-worker production deployments
-    - Redis pub/sub for event broadcasting across workers
-    - Distributed state storage with TTL (default 3600s)
-    - Distributed locking using SETNX pattern
-    - Connection pooling and auto-reconnection
-  - Implemented `StateSyncManager` to coordinate state synchronization
-    - Auto-generates unique worker IDs (hostname:pid:timestamp)
-    - Registers circuit breakers for state sync
-    - Handles local→remote and remote→local state changes
-    - Graceful startup state loading from distributed storage
-  - Added `CircuitBreakerEvent` and `StateUpdateEvent` for state changes
-  - Added `StateSerializer` for JSON serialization with datetime/enum support
-  - Integrated sync manager into `CircuitBreaker` class
-    - Broadcasts state changes (OPENED, CLOSED, HALF_OPEN, FAILURE, SUCCESS)
-    - Applies remote state changes from other workers
-    - Thread-safe state serialization/deserialization
-  - Integrated sync manager into `FlexiAI` client
-    - Optional sync manager initialization based on configuration
-    - Automatic fallback from Redis to Memory backend
-    - Passes sync_manager to provider registry and circuit breakers
-    - Graceful shutdown with `close()` method
-  - Added `SyncConfig` model for multi-worker configuration
-    - Redis connection settings (host, port, db, password, SSL)
-    - Worker ID customization
-    - Key prefix and pub/sub channel configuration
-    - State TTL configuration
-  - Tests:
-    - 15/15 memory backend tests passing
-    - Event, serializer, and manager tests added (need API alignment)
-    - Total sync test coverage: 65 tests added
-
-- **Phase 7.1: FlexiAI Decorator Implementation (Complete)**
 - **Removed GeminiProvider (Google Gemini Developer API)**
   - Removed `flexiai/providers/gemini_provider.py`
   - Removed `tests/unit/test_gemini_provider.py`
