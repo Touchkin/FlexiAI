@@ -2,70 +2,85 @@
 """Advanced Decorator Examples.
 
 This example demonstrates advanced features of the @flexiai_chat decorator:
+- Multi-provider configuration with failover
 - Provider selection
-- Fallback configuration
-- Multiple function parameters
+- Temperature control for different tasks
 - Different decorator syntax options
+
+Requirements:
+    - Set OPENAI_API_KEY environment variable
+    - Optionally set GOOGLE_APPLICATION_CREDENTIALS for Vertex AI
 """
+
+import os
 
 from flexiai import FlexiAI, FlexiAIConfig, flexiai_chat
 
-# Configure FlexiAI with multiple providers and fallback
+# Configure FlexiAI with multiple providers and automatic failover
 config = FlexiAIConfig(
     providers=[
-        {"name": "openai", "api_key": "your-openai-api-key"},
-        {"name": "gemini", "api_key": "your-gemini-api-key"},
-        {"name": "anthropic", "api_key": "your-anthropic-api-key"},
+        {
+            "name": "openai",
+            "api_key": os.getenv("OPENAI_API_KEY"),
+            "model": "gpt-4o-mini",
+            "priority": 1,  # Primary provider
+        },
+        {
+            "name": "vertexai",
+            "api_key": "not-used",  # Uses Application Default Credentials (service account)
+            "model": "gemini-1.5-flash",
+            "priority": 2,  # Fallback provider
+            "config": {
+                "project": "dev-gemini-427512",  # GCP project ID
+                "location": "us-central1",
+            },
+        },
     ],
-    primary_provider="openai",
-    fallback_providers=["gemini", "anthropic"],
 )
 
 FlexiAI.set_global_config(config)
 
 
-# Example 1: Specify provider explicitly
-@flexiai_chat(provider="gemini", temperature=0.7)
+# Example 1: Use OpenAI explicitly
+@flexiai_chat(provider="openai", temperature=0.3)
+def openai_assistant(question: str) -> str:
+    """Use OpenAI specifically for precise answers."""
+    pass
+
+
+# Example 2: Use Vertex AI/Gemini explicitly
+@flexiai_chat(provider="vertexai", temperature=0.7)
 def gemini_assistant(question: str) -> str:
-    """Use Google Gemini specifically."""
+    """Use Google Gemini via Vertex AI for balanced responses."""
     pass
 
 
-# Example 2: Function with multiple parameters
+# Example 3: Function for travel advice (shows multi-parameter usage)
 @flexiai_chat(system_message="You are a travel expert. Provide detailed recommendations.")
-def travel_advisor(destination: str, budget: str, interests: str) -> str:
-    """Get travel advice based on multiple criteria."""
-    # The first parameter is used as the user message
-    # You can use it to construct the prompt
+def travel_advisor(query: str, budget: str = None, interests: str = None) -> str:
+    """Get travel advice. First parameter is always the user message."""
     pass
 
 
-# Example 3: Low temperature for factual responses
+# Example 4: Low temperature for factual responses
 @flexiai_chat(
-    system_message="Provide accurate, factual information with citations.",
+    system_message="Provide accurate, factual information.",
     temperature=0.1,
-    max_tokens=1000,
+    max_tokens=300,
 )
 def fact_checker(claim: str) -> str:
-    """Verify factual claims."""
+    """Verify factual claims with low temperature (more deterministic)."""
     pass
 
 
-# Example 4: High temperature for creative tasks
+# Example 5: High temperature for creative tasks
 @flexiai_chat(
     system_message="You are a creative storyteller.",
     temperature=0.95,
-    max_tokens=2000,
+    max_tokens=500,
 )
 def story_generator(theme: str) -> str:
-    """Generate creative stories."""
-    pass
-
-
-# Example 5: Streaming responses
-@flexiai_chat(stream=True)
-def streaming_chat(message: str) -> str:
-    """Chat with streaming responses."""
+    """Generate creative stories with high temperature (more random)."""
     pass
 
 

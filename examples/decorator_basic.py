@@ -3,7 +3,13 @@
 
 This example demonstrates the simplest usage of the @flexiai_chat decorator
 for creating AI-powered functions.
+
+Requirements:
+    - Set OPENAI_API_KEY environment variable
+    - Install flexiai: pip install -e .
 """
+
+import os
 
 from flexiai import FlexiAI, FlexiAIConfig, flexiai_chat
 
@@ -13,15 +19,15 @@ config = FlexiAIConfig(
     providers=[
         {
             "name": "openai",
-            "api_key": "your-openai-api-key-here",  # Replace with real key
+            "api_key": os.getenv("OPENAI_API_KEY"),  # Read from environment
+            "model": "gpt-4o-mini",  # Required field
+            "priority": 1,  # Required field
         },
     ],
-    primary_provider="openai",
 )
 
-# Set global config using either method:
+# Set global config
 FlexiAI.set_global_config(config)
-# OR: set_global_config(config)
 
 
 # Example 1: Simplest decorator usage
