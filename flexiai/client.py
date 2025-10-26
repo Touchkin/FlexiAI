@@ -8,7 +8,7 @@ a unified interface for GenAI API calls with automatic failover.
 
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from flexiai.exceptions import AllProvidersFailedError, CircuitBreakerOpenError
 from flexiai.models import FlexiAIConfig, UnifiedRequest, UnifiedResponse
@@ -20,6 +20,9 @@ from flexiai.providers import (
     VertexAIProvider,
 )
 from flexiai.utils.logger import FlexiAILogger
+
+if TYPE_CHECKING:
+    from flexiai.sync.manager import StateSyncManager
 
 
 class FlexiAI:
@@ -103,12 +106,79 @@ class FlexiAI:
             "failed_requests": 0,
             "providers_used": {},
         }
+        self._sync_manager: Optional["StateSyncManager"] = None
+
+        # Initialize sync manager if enabled in config
+        self._initialize_sync_manager()
 
         # Register providers from config
         if config:
             self._register_providers_from_config()
 
-        self.logger.info("FlexiAI client initialized")
+        # Start sync manager after providers are registered
+        if self._sync_manager is not None:
+            self._sync_manager.start()
+
+        self.logger.info(
+            "FlexiAI client initialized",
+            extra={"sync_enabled": self._sync_manager is not None},
+        )
+
+    def _initialize_sync_manager(self) -> None:
+        """Initialize sync manager if enabled in configuration."""
+        # Check if sync is enabled in config
+        sync_enabled = False
+        sync_config = {}
+
+        if self.config and hasattr(self.config, "sync") and self.config.sync:
+            sync_config = self.config.sync if isinstance(self.config.sync, dict) else {}
+            sync_enabled = sync_config.get("enabled", False)
+
+        if not sync_enabled:
+            return
+
+        try:
+            from flexiai.sync.manager import StateSyncManager
+            from flexiai.sync.memory_backend import MemorySyncBackend
+            from flexiai.sync.redis_backend import RedisSyncBackend
+
+            # Determine backend
+            backend_type = sync_config.get("backend", "redis")
+
+            if backend_type == "redis":
+                # Try to create Redis backend
+                redis_config = sync_config.get("redis", {})
+                try:
+                    backend = RedisSyncBackend(
+                        host=redis_config.get("host", "localhost"),
+                        port=redis_config.get("port", 6379),
+                        db=redis_config.get("db", 0),
+                        password=redis_config.get("password"),
+                        ssl=redis_config.get("ssl", False),
+                        key_prefix=sync_config.get("key_prefix", "flexiai"),
+                        channel=sync_config.get("channel", "flexiai:events"),
+                        state_ttl=sync_config.get("state_ttl", 3600),
+                    )
+                    self.logger.info("Initialized Redis sync backend")
+                except Exception as e:
+                    # Fall back to memory backend
+                    self.logger.warning(
+                        f"Failed to initialize Redis backend, falling back to memory: {str(e)}"
+                    )
+                    backend = MemorySyncBackend()
+            else:
+                # Use memory backend
+                backend = MemorySyncBackend()
+                self.logger.info("Initialized memory sync backend")
+
+            # Create sync manager
+            worker_id = sync_config.get("worker_id")
+            self._sync_manager = StateSyncManager(backend=backend, worker_id=worker_id)
+
+        except ImportError:
+            self.logger.warning("Sync module not available, sync disabled")
+        except Exception as e:  # nosec B110
+            self.logger.error(f"Failed to initialize sync manager: {str(e)}")
 
     def _register_providers_from_config(self) -> None:
         """Register all providers from configuration."""
@@ -119,10 +189,11 @@ class FlexiAI:
             # Create provider instance based on name
             provider = self._create_provider(provider_config)
 
-            # Register with circuit breaker config
+            # Register with circuit breaker config and sync manager
             self.registry.register(
                 provider=provider,
                 circuit_breaker_config=self.config.circuit_breaker,
+                sync_manager=self._sync_manager,
             )
 
             self.logger.info(
@@ -455,6 +526,24 @@ class FlexiAI:
         self.registry.register(provider, circuit_breaker_config=cb_config)
         self.logger.info(f"Manually registered provider '{provider.name}'")
 
+    def close(self) -> None:
+        """
+        Gracefully shutdown FlexiAI client and cleanup resources.
+
+        This method should be called when the client is no longer needed
+        to properly cleanup sync manager and other resources.
+        """
+        if self._sync_manager is not None:
+            try:
+                self._sync_manager.stop()
+                self.logger.info("Sync manager stopped")
+            except Exception as e:
+                self.logger.error(f"Error stopping sync manager: {e}")
+            finally:
+                self._sync_manager = None
+
+        self.logger.info("FlexiAI client closed")
+
     def __repr__(self) -> str:
         """Return string representation of the client."""
         provider_count = len(self.registry)
@@ -466,4 +555,5 @@ class FlexiAI:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
+        self.close()
         self.logger.info("FlexiAI client context exiting")
