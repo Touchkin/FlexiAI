@@ -225,10 +225,10 @@ response = client.chat_completion(
 ```python
 # Get health status of all providers
 status = client.get_provider_status()
-for provider_name, info in status.items():
-    print(f"{provider_name}: {info['healthy']}")
-    print(f"  Circuit Breaker: {info['circuit_breaker']['state']}")
-    print(f"  Success Rate: {info['successful_requests']}/{info['total_requests']}")
+for provider_info in status['providers']:
+    print(f"{provider_info['name']}: {provider_info['healthy']}")
+    print(f"  Circuit Breaker: {provider_info['circuit_breaker']['state']}")
+    print(f"  Success Rate: {provider_info['successful_requests']}/{provider_info['total_requests']}")
 ```
 
 ### Request Statistics
@@ -333,12 +333,12 @@ except Exception as e:
 # Monitor circuit breaker state transitions
 provider_status = client.get_provider_status()
 
-for provider_name, info in provider_status.items():
-    print(f"\nProvider: {provider_name}")
-    print(f"  State: {info['circuit_breaker']['state']}")
-    print(f"  Healthy: {info['healthy']}")
-    print(f"  Failure Count: {info['circuit_breaker']['failure_count']}")
-    print(f"  Success Count: {info['circuit_breaker']['success_count']}")
+for provider_info in provider_status['providers']:
+    print(f"\nProvider: {provider_info['name']}")
+    print(f"  State: {provider_info['circuit_breaker']['state']}")
+    print(f"  Healthy: {provider_info['healthy']}")
+    print(f"  Failure Count: {provider_info['circuit_breaker']['failure_count']}")
+    print(f"  Success Count: {provider_info['circuit_breaker']['success_count']}")
 ```
 
 **Circuit Breaker States:**
@@ -369,8 +369,8 @@ print(f"✅ Successful request: {response.content}")
 
 # Check that circuit is CLOSED (healthy)
 status = client.get_provider_status()
-for provider, info in status.items():
-    state = info['circuit_breaker']['state']
+for provider_info in status['providers']:
+    state = provider_info['circuit_breaker']['state']
     print(f"Circuit state after success: {state}")
     assert state == "CLOSED", "Circuit should be CLOSED after successful request"
 ```
@@ -847,7 +847,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [x] Phase 1: OpenAI Support
 - [x] Phase 2: Google Vertex AI Support
-- [ ] Phase 3: Anthropic Claude Support
+- [x] Phase 3: Anthropic Claude Support
 - [ ] Phase 4: Streaming Support
 - [ ] Phase 5: Azure OpenAI Support
 - [ ] Phase 6: AWS Bedrock Support
