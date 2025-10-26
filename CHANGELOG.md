@@ -7,7 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Removed
+### Added
+- **Phase 7.2: Multi-Worker Synchronization Architecture (In Progress)**
+  - Added `flexiai/sync/` module for distributed state synchronization
+  - Implemented `BaseSyncBackend` abstract interface for sync backends
+  - Implemented `MemorySyncBackend` for single-worker/development environments
+  - Implemented `RedisSyncBackend` for multi-worker production deployments
+    - Redis pub/sub for event broadcasting across workers
+    - Distributed state storage with TTL (default 3600s)
+    - Distributed locking using SETNX pattern
+    - Connection pooling and auto-reconnection
+  - Implemented `StateSyncManager` to coordinate state synchronization
+    - Auto-generates unique worker IDs (hostname:pid:timestamp)
+    - Registers circuit breakers for state sync
+    - Handles local→remote and remote→local state changes
+    - Graceful startup state loading from distributed storage
+  - Added `CircuitBreakerEvent` and `StateUpdateEvent` for state changes
+  - Added `StateSerializer` for JSON serialization with datetime/enum support
+  - Integrated sync manager into `CircuitBreaker` class
+    - Broadcasts state changes (OPENED, CLOSED, HALF_OPEN, FAILURE, SUCCESS)
+    - Applies remote state changes from other workers
+    - Thread-safe state serialization/deserialization
+  - Integrated sync manager into `FlexiAI` client
+    - Optional sync manager initialization based on configuration
+    - Automatic fallback from Redis to Memory backend
+    - Passes sync_manager to provider registry and circuit breakers
+    - Graceful shutdown with `close()` method
+  - Added `SyncConfig` model for multi-worker configuration
+    - Redis connection settings (host, port, db, password, SSL)
+    - Worker ID customization
+    - Key prefix and pub/sub channel configuration
+    - State TTL configuration
+  - Tests:
+    - 15/15 memory backend tests passing
+    - Event, serializer, and manager tests added (need API alignment)
+    - Total sync test coverage: 65 tests added
+
+- **Phase 7.1: FlexiAI Decorator Implementation (Complete)**
 - **Removed GeminiProvider (Google Gemini Developer API)**
   - Removed `flexiai/providers/gemini_provider.py`
   - Removed `tests/unit/test_gemini_provider.py`
